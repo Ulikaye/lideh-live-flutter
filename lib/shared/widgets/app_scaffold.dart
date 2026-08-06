@@ -55,7 +55,7 @@ class AppScaffold extends StatelessWidget {
               padding: const EdgeInsets.symmetric(vertical: 16),
               child: Column(
                 children: [
-                  const Icon(Icons.music_note_rounded, color: AppColors.primary, size: 32),
+                  Image.asset('assets/images/logo.png', height: 40),
                   const SizedBox(height: 4),
                   Text(AppStrings.appName, style: Theme.of(context).textTheme.titleMedium),
                 ],

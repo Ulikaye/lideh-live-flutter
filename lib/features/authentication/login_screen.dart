@@ -84,7 +84,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Icon(Icons.music_note_rounded, color: AppColors.primary, size: 48),
+                  Image.asset('assets/images/logo.png', height: 72),
                   const SizedBox(height: 12),
                   Text(AppStrings.appName, style: Theme.of(context).textTheme.headlineMedium, textAlign: TextAlign.center),
                   const SizedBox(height: 4),
