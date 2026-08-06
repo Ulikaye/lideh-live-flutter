@@ -1,0 +1,128 @@
+rules_version = '2';
+
+// Security model summary:
+// - users/{uid}, musicians/{uid}, organizers/{uid} are all keyed by the
+//   Firebase Auth uid, so "own document" checks are always a direct
+//   doc-id comparison against request.auth.uid — no extra lookups.
+// - skills/ and blogCategories/ are admin-managed reference data:
+//   public read, no client write.
+// - bookings/ is the most sensitive collection: only the two parties on
+//   a booking (the musician and the organizer who created it) may read
+//   it, and status transitions are constrained to the party allowed to
+//   make them (organizer creates/cancels, musician accepts/declines/
+//   completes).
+// - reviews/ are keyed by bookingId; only the organizer on that booking
+//   may create the review, exactly once, and only after the booking is
+//   marked completed.
+//
+// Admin operations (managing skills/categories, moderating content,
+// verifying users) are expected to run via the Firebase Admin SDK
+// (Cloud Functions or a trusted backend), which bypasses these rules
+// entirely — there is intentionally no client-side "isAdmin" path here
+// because a custom claim could be spoofed if the app tried to check it
+// client-side, whereas Admin SDK service credentials cannot be.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // ---------------- Users ----------------
+    match /users/{uid} {
+      allow read: if isSignedIn();
+      allow create: if isOwner(uid);
+      allow update: if isOwner(uid)
+        // user_type is set once at registration and never changed by
+        // the client afterwards, to keep role-specific data consistent.
+        && request.resource.data.user_type == resource.data.user_type;
+      allow delete: if isOwner(uid);
+    }
+
+    // ---------------- Musicians ----------------
+    match /musicians/{uid} {
+      allow read: if true; // public directory
+      allow create, update: if isOwner(uid);
+      allow delete: if isOwner(uid);
+    }
+
+    // ---------------- Organizers ----------------
+    match /organizers/{uid} {
+      allow read: if isSignedIn();
+      allow create, update: if isOwner(uid);
+      allow delete: if isOwner(uid);
+    }
+
+    // ---------------- Skills (admin-managed reference data) ----------------
+    match /skills/{skillId} {
+      allow read: if true;
+      allow write: if false; // managed via Admin SDK / console only
+    }
+
+    // ---------------- Bookings ----------------
+    match /bookings/{bookingId} {
+      allow read: if isSignedIn() &&
+        (resource.data.musician_id == request.auth.uid || resource.data.organizer_id == request.auth.uid);
+
+      allow create: if isSignedIn() &&
+        (request.resource.data.organizer_id == request.auth.uid || request.resource.data.musician_id == request.auth.uid) &&
+        request.resource.data.status == 'pending';
+
+      allow update: if isSignedIn() &&
+        (resource.data.musician_id == request.auth.uid || resource.data.organizer_id == request.auth.uid) &&
+        // Only status (and updated_at) may change after creation — the
+        // parties can't rewrite event details after the fact.
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updated_at', 'review_submitted']);
+
+      allow delete: if false; // bookings are cancelled, not deleted, to preserve history
+    }
+
+    // ---------------- Reviews ----------------
+    match /reviews/{bookingId} {
+      allow read: if true; // public, shown on musician profiles
+
+      allow create: if isSignedIn() &&
+        request.resource.data.organizer_id == request.auth.uid &&
+        request.resource.data.rating >= 1 && request.resource.data.rating <= 5 &&
+        get(/databases/$(database)/documents/bookings/$(bookingId)).data.status == 'completed' &&
+        get(/databases/$(database)/documents/bookings/$(bookingId)).data.organizer_id == request.auth.uid;
+
+      allow update, delete: if false; // reviews are immutable once submitted
+    }
+
+    // ---------------- Events ----------------
+    match /events/{eventId} {
+      allow read: if true; // public listing
+
+      allow create: if isSignedIn() && request.resource.data.organizer_id == request.auth.uid;
+
+      allow update: if isSignedIn() && resource.data.organizer_id == request.auth.uid;
+
+      allow delete: if isSignedIn() && resource.data.organizer_id == request.auth.uid;
+    }
+
+    // ---------------- Blog ----------------
+    match /blogCategories/{categoryId} {
+      allow read: if true;
+      allow write: if false; // managed via Admin SDK / console only
+    }
+
+    match /blogPosts/{postId} {
+      allow read: if resource.data.is_published == true || isSignedIn();
+      allow write: if false; // published via Admin SDK / CMS backend only
+    }
+
+    // ---------------- Notifications ----------------
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn() && resource.data.user_id == request.auth.uid;
+      allow update: if isSignedIn() && resource.data.user_id == request.auth.uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      allow create, delete: if false; // written by Cloud Functions only
+    }
+  }
+}

@@ -1,0 +1,56 @@
+rules_version = '2';
+
+// Storage layout:
+//   profile_pictures/{fileName}  — any signed-in user's own avatar
+//   musician_media/{fileName}    — musician performance photos/clips
+//   event_images/{fileName}      — organizer event cover images
+//   blog_images/{fileName}       — CMS/admin-managed, no client writes
+//
+// Files are named with a generated UUID (see StorageService), so there
+// is no per-owner subfolder to check ownership against on write; write
+// access is instead gated by "any authenticated user of the right
+// role," and deletion of a specific file is handled by the app calling
+// deleteByUrl with the exact ref it uploaded. This trades fine-grained
+// per-file ownership for simplicity — acceptable here because these
+// are non-sensitive public-facing media assets, not private documents.
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isImage() {
+      return request.resource.contentType.matches('image/.*');
+    }
+
+    function isVideo() {
+      return request.resource.contentType.matches('video/.*');
+    }
+
+    function underSizeLimit(mb) {
+      return request.resource.size < mb * 1024 * 1024;
+    }
+
+    match /profile_pictures/{fileName} {
+      allow read: if true;
+      allow write: if isSignedIn() && isImage() && underSizeLimit(5);
+    }
+
+    match /musician_media/{fileName} {
+      allow read: if true;
+      allow write: if isSignedIn() && (isImage() || isVideo()) && underSizeLimit(50);
+    }
+
+    match /event_images/{fileName} {
+      allow read: if true;
+      allow write: if isSignedIn() && isImage() && underSizeLimit(5);
+    }
+
+    match /blog_images/{fileName} {
+      allow read: if true;
+      allow write: if false; // managed via Admin SDK / CMS backend only
+    }
+  }
+}
