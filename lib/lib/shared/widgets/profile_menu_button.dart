@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/constants/strings.dart';
 import '../../providers/auth_provider.dart';
 
 /// Persistent profile/logout access point. Every top-level screen
@@ -22,6 +23,8 @@ class ProfileMenuButton extends ConsumerWidget {
       onSelected: (value) async {
         if (value == 'profile') {
           context.go('/profile');
+        } else if (value == 'admin_blog') {
+          context.go('/admin/blog');
         } else if (value == 'signout') {
           await ref.read(authServiceProvider).signOut();
           if (context.mounted) context.go('/login');
@@ -38,6 +41,17 @@ class ProfileMenuButton extends ConsumerWidget {
             ],
           ),
         ),
+        if (profile?.userType == UserType.admin)
+          const PopupMenuItem(
+            value: 'admin_blog',
+            child: Row(
+              children: [
+                Icon(Icons.dashboard_customize_outlined, size: 18, color: AppColors.textSecondary),
+                SizedBox(width: 10),
+                Text('Manage Blog'),
+              ],
+            ),
+          ),
         const PopupMenuItem(
           value: 'signout',
           child: Row(

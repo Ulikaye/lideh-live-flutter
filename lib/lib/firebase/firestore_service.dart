@@ -217,4 +217,30 @@ class FirestoreService {
     return _db.collection(AppStrings.blogPostsCollection).doc(id).snapshots().map(
         (doc) => doc.exists ? BlogPost.fromMap(id, doc.data()!) : null);
   }
+
+  // ---------------- Blog admin ----------------
+  /// Unfiltered — includes drafts — for the admin post list. Regular
+  /// readers only ever see [watchBlogPosts], which filters to
+  /// `is_published: true`.
+  Stream<List<BlogPost>> watchAllBlogPostsForAdmin({int limit = 100}) {
+    return _db
+        .collection(AppStrings.blogPostsCollection)
+        .orderBy('published_date', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map((snap) => snap.docs.map((d) => BlogPost.fromMap(d.id, d.data())).toList());
+  }
+
+  Future<String> createBlogPost(BlogPost post) async {
+    final ref = await _db.collection(AppStrings.blogPostsCollection).add(post.toMap());
+    return ref.id;
+  }
+
+  Future<void> setBlogPost(String id, BlogPost post) {
+    return _db.collection(AppStrings.blogPostsCollection).doc(id).set(post.toMap());
+  }
+
+  Future<void> deleteBlogPost(String id) {
+    return _db.collection(AppStrings.blogPostsCollection).doc(id).delete();
+  }
 }

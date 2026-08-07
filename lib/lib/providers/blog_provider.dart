@@ -17,3 +17,8 @@ final blogPostsProvider = StreamProvider<List<BlogPost>>((ref) {
 final blogPostByIdProvider = StreamProvider.family<BlogPost?, String>((ref, id) {
   return ref.watch(firestoreServiceProvider).watchBlogPost(id);
 });
+
+/// Unfiltered post list (includes drafts) for the admin blog dashboard.
+final adminBlogPostsProvider = StreamProvider<List<BlogPost>>((ref) {
+  return ref.watch(firestoreServiceProvider).watchAllBlogPostsForAdmin();
+});
