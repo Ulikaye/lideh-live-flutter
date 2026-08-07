@@ -2,7 +2,8 @@ class AppStrings {
   AppStrings._();
 
   static const appName = 'LiDeH Live';
-  static const tagline = 'Connecting Gospel Musicians with the Church';
+  static const tagline =
+      'Discover, connect, and book gospel musicians with ease.';
 
   // Firestore collection names — single source of truth so a rename
   // only ever happens in one place.
