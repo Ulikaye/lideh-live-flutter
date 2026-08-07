@@ -5,7 +5,9 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/strings.dart';
 import '../../core/utils/responsive.dart';
 import '../../providers/musician_provider.dart';
+import '../../shared/widgets/app_icon_asset.dart';
 import '../../shared/widgets/app_logo.dart';
+import '../../shared/widgets/app_footer.dart';
 import '../../shared/widgets/profile_menu_button.dart';
 import 'widgets/featured_musicians.dart';
 
@@ -52,6 +54,7 @@ class HomeScreen extends ConsumerWidget {
                 ],
               ),
             ),
+            const AppFooter(),
           ],
         ),
       ),
@@ -133,9 +136,9 @@ class _QuickLinksSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final columns = Responsive.gridColumns(context).clamp(1, 3);
     final items = [
-      _QuickLink(icon: Icons.event_outlined, title: 'Upcoming Events', subtitle: 'See what\'s happening near you', route: '/events'),
-      _QuickLink(icon: Icons.article_outlined, title: 'Content Hub', subtitle: 'Stories, tips and testimonials', route: '/blog'),
-      _QuickLink(icon: Icons.music_note_outlined, title: 'Browse Musicians', subtitle: 'Explore the full directory', route: '/musicians'),
+      _QuickLink(iconName: 'calendar', title: 'Upcoming Events', subtitle: 'See what\'s happening near you', route: '/events'),
+      _QuickLink(iconName: 'blog', title: 'Content Hub', subtitle: 'Stories, tips and testimonials', route: '/blog'),
+      _QuickLink(iconName: 'music', title: 'Browse Musicians', subtitle: 'Explore the full directory', route: '/musicians'),
     ];
     return GridView.count(
       crossAxisCount: columns,
@@ -150,11 +153,11 @@ class _QuickLinksSection extends StatelessWidget {
 }
 
 class _QuickLink {
-  final IconData icon;
+  final String iconName;
   final String title;
   final String subtitle;
   final String route;
-  _QuickLink({required this.icon, required this.title, required this.subtitle, required this.route});
+  _QuickLink({required this.iconName, required this.title, required this.subtitle, required this.route});
 }
 
 class _QuickLinkCard extends StatelessWidget {
@@ -172,7 +175,7 @@ class _QuickLinkCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(item.icon, color: AppColors.primary, size: 28),
+              AppIconAsset(item.iconName, color: AppColors.primary, size: 28),
               const SizedBox(height: 12),
               Text(item.title, style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 4),

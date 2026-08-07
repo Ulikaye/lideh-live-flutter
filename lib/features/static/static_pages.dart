@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/strings.dart';
 import '../../core/utils/responsive.dart';
+import '../../shared/widgets/app_footer.dart';
 
-enum StaticPageType { about, contact, terms, privacy }
+enum StaticPageType { about, contact, terms, privacy, credits }
 
 class StaticPage extends StatelessWidget {
   final StaticPageType type;
@@ -20,6 +22,8 @@ class StaticPage extends StatelessWidget {
         return 'Terms of Service';
       case StaticPageType.privacy:
         return 'Privacy Policy';
+      case StaticPageType.credits:
+        return 'Credits';
     }
   }
 
@@ -28,11 +32,16 @@ class StaticPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: Text(_title)),
       body: SingleChildScrollView(
-        child: CenteredContent(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 720),
-            child: _buildBody(context),
-          ),
+        child: Column(
+          children: [
+            CenteredContent(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 720),
+                child: _buildBody(context),
+              ),
+            ),
+            const AppFooter(),
+          ],
         ),
       ),
     );
@@ -48,6 +57,8 @@ class StaticPage extends StatelessWidget {
         return _StaticText(title: 'Terms of Service', body: _termsBody);
       case StaticPageType.privacy:
         return _StaticText(title: 'Privacy Policy', body: _privacyBody);
+      case StaticPageType.credits:
+        return const _Credits();
     }
   }
 }
@@ -71,6 +82,14 @@ class _About extends StatelessWidget {
           'Every completed booking can be reviewed, helping new organizers choose with confidence '
           'and giving musicians a track record that grows with every event they play.',
           style: TextStyle(height: 1.6),
+        ),
+        const SizedBox(height: 32),
+        InkWell(
+          onTap: () => context.go('/credits'),
+          child: const Text(
+            'Design credits',
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary, decoration: TextDecoration.underline),
+          ),
         ),
       ],
     );
@@ -120,6 +139,26 @@ class _StaticText extends StatelessWidget {
         Text(title, style: Theme.of(context).textTheme.headlineMedium),
         const SizedBox(height: 20),
         Text(body, style: const TextStyle(height: 1.6, color: AppColors.textPrimary)),
+      ],
+    );
+  }
+}
+
+class _Credits extends StatelessWidget {
+  const _Credits();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Credits', style: Theme.of(context).textTheme.headlineMedium),
+        const SizedBox(height: 20),
+        const Text(
+          'Some icons used throughout this app are from Flaticon (flaticon.com), '
+          'including icon packs by Magnific.',
+          style: TextStyle(height: 1.6, color: AppColors.textSecondary),
+        ),
       ],
     );
   }

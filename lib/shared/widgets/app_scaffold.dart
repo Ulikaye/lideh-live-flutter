@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/strings.dart';
 import '../../core/utils/responsive.dart';
+import 'app_icon_asset.dart';
 
 /// The top-level shell rendered around every primary route.
 ///
@@ -17,12 +18,17 @@ class AppScaffold extends StatelessWidget {
 
   const AppScaffold({super.key, required this.child, required this.currentIndex, this.userType});
 
+  // Icon names map to files in assets/icons/ (custom brand icon set).
+  // The same asset is used for both the selected and unselected slot —
+  // Flutter's NavigationBar/NavigationRail already apply a different
+  // ambient IconTheme color per state, and AppIconAsset reads that
+  // automatically, so one icon file covers both states cleanly.
   static const _destinations = [
-    _NavDest('Home', Icons.home_outlined, Icons.home_rounded, '/'),
-    _NavDest('Musicians', Icons.music_note_outlined, Icons.music_note_rounded, '/musicians'),
-    _NavDest('Events', Icons.event_outlined, Icons.event_rounded, '/events'),
-    _NavDest('Blog', Icons.article_outlined, Icons.article_rounded, '/blog'),
-    _NavDest('Dashboard', Icons.dashboard_outlined, Icons.dashboard_rounded, '/dashboard'),
+    _NavDest('Home', 'home', '/'),
+    _NavDest('Musicians', 'music', '/musicians'),
+    _NavDest('Events', 'calendar', '/events'),
+    _NavDest('Blog', 'blog', '/blog'),
+    _NavDest('Dashboard', 'person_single', '/dashboard'),
   ];
 
   void _onSelect(BuildContext context, int index) {
@@ -38,7 +44,11 @@ class AppScaffold extends StatelessWidget {
           selectedIndex: currentIndex,
           onDestinationSelected: (i) => _onSelect(context, i),
           destinations: _destinations
-              .map((d) => NavigationDestination(icon: Icon(d.icon), selectedIcon: Icon(d.activeIcon), label: d.label))
+              .map((d) => NavigationDestination(
+                    icon: AppIconAsset(d.iconName, size: 24),
+                    selectedIcon: AppIconAsset(d.iconName, size: 24),
+                    label: d.label,
+                  ))
               .toList(),
         ),
       );
@@ -62,7 +72,11 @@ class AppScaffold extends StatelessWidget {
               ),
             ),
             destinations: _destinations
-                .map((d) => NavigationRailDestination(icon: Icon(d.icon), selectedIcon: Icon(d.activeIcon), label: Text(d.label)))
+                .map((d) => NavigationRailDestination(
+                      icon: AppIconAsset(d.iconName, size: 24),
+                      selectedIcon: AppIconAsset(d.iconName, size: 24),
+                      label: Text(d.label),
+                    ))
                 .toList(),
           ),
           const VerticalDivider(width: 1),
@@ -75,8 +89,7 @@ class AppScaffold extends StatelessWidget {
 
 class _NavDest {
   final String label;
-  final IconData icon;
-  final IconData activeIcon;
+  final String iconName;
   final String route;
-  const _NavDest(this.label, this.icon, this.activeIcon, this.route);
+  const _NavDest(this.label, this.iconName, this.route);
 }

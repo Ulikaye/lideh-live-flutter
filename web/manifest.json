@@ -3,8 +3,8 @@
     "short_name": "LiDeH Live",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#1DA1F2",
-    "theme_color": "#1DA1F2",
+    "background_color": "#2D4042",
+    "theme_color": "#2D4042",
     "description": "Connecting Gospel Musicians with the Church",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
@@ -33,4 +33,5 @@
         }
     ]
 }
+
 

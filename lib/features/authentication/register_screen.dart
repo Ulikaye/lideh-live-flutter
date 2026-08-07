@@ -6,6 +6,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/strings.dart';
 import '../../core/utils/validators.dart';
 import '../../providers/auth_provider.dart';
+import '../../shared/widgets/app_icon_asset.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -80,7 +81,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         child: _RoleCard(
                           label: 'Organizer',
                           subtitle: 'Book musicians for events',
-                          icon: Icons.church_outlined,
+                          iconName: 'person_double',
                           selected: _userType == UserType.organizer,
                           onTap: () => setState(() => _userType = UserType.organizer),
                         ),
@@ -90,7 +91,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         child: _RoleCard(
                           label: 'Musician',
                           subtitle: 'Get booked for events',
-                          icon: Icons.music_note_outlined,
+                          iconName: 'music',
                           selected: _userType == UserType.musician,
                           onTap: () => setState(() => _userType = UserType.musician),
                         ),
@@ -160,11 +161,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 class _RoleCard extends StatelessWidget {
   final String label;
   final String subtitle;
-  final IconData icon;
+  final String iconName;
   final bool selected;
   final VoidCallback onTap;
 
-  const _RoleCard({required this.label, required this.subtitle, required this.icon, required this.selected, required this.onTap});
+  const _RoleCard({required this.label, required this.subtitle, required this.iconName, required this.selected, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -180,7 +181,7 @@ class _RoleCard extends StatelessWidget {
         ),
         child: Column(
           children: [
-            Icon(icon, color: selected ? AppColors.primary : AppColors.textSecondary, size: 32),
+            AppIconAsset(iconName, color: selected ? AppColors.primary : AppColors.textSecondary, size: 32),
             const SizedBox(height: 8),
             Text(label, style: TextStyle(fontWeight: FontWeight.w700, color: selected ? AppColors.primary : AppColors.textPrimary)),
             const SizedBox(height: 4),

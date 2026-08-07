@@ -5,10 +5,12 @@ import '../../core/constants/strings.dart';
 import '../../models/booking.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/booking_provider.dart';
+import '../../providers/musician_provider.dart';
 import '../../shared/widgets/error_widget.dart';
 import '../../shared/widgets/loading_indicator.dart';
 import '../../shared/widgets/profile_menu_button.dart';
 import '../bookings/widgets/booking_card.dart';
+import 'widgets/musician_profile_header.dart';
 
 /// Musician's operational home base: everything needed to manage
 /// incoming booking requests without leaving one screen, mirroring the
@@ -35,6 +37,7 @@ class _MusicianDashboardState extends ConsumerState<MusicianDashboard> with Sing
     if (profile == null) return const LoadingIndicator();
 
     final bookingsAsync = ref.watch(bookingsForMusicianProvider(profile.uid));
+    final musicianAsync = ref.watch(musicianByIdProvider(profile.uid));
 
     return Scaffold(
       appBar: AppBar(
@@ -45,23 +48,31 @@ class _MusicianDashboardState extends ConsumerState<MusicianDashboard> with Sing
           tabs: const [Tab(text: 'Pending'), Tab(text: 'Upcoming'), Tab(text: 'Past')],
         ),
       ),
-      body: bookingsAsync.when(
-        loading: () => const LoadingIndicator(),
-        error: (e, _) => AppErrorWidget(message: 'Could not load bookings'),
-        data: (bookings) {
-          final pending = bookings.where((b) => b.status == BookingStatus.pending).toList();
-          final upcoming = bookings.where((b) => b.status == BookingStatus.accepted).toList();
-          final past = bookings.where((b) => b.status == BookingStatus.completed || b.status == BookingStatus.declined || b.status == BookingStatus.cancelled).toList();
+      body: Column(
+        children: [
+          MusicianProfileHeader(profile: profile, musician: musicianAsync.value),
+          const Divider(height: 1, color: AppColors.border),
+          Expanded(
+            child: bookingsAsync.when(
+              loading: () => const LoadingIndicator(),
+              error: (e, _) => AppErrorWidget(message: 'Could not load bookings'),
+              data: (bookings) {
+                final pending = bookings.where((b) => b.status == BookingStatus.pending).toList();
+                final upcoming = bookings.where((b) => b.status == BookingStatus.accepted).toList();
+                final past = bookings.where((b) => b.status == BookingStatus.completed || b.status == BookingStatus.declined || b.status == BookingStatus.cancelled).toList();
 
-          return TabBarView(
-            controller: _tabController,
-            children: [
-              _BookingListTab(bookings: pending, emptyText: 'No pending requests'),
-              _BookingListTab(bookings: upcoming, emptyText: 'No upcoming bookings'),
-              _BookingListTab(bookings: past, emptyText: 'No past bookings'),
-            ],
-          );
-        },
+                return TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _BookingListTab(bookings: pending, emptyText: 'No pending requests'),
+                    _BookingListTab(bookings: upcoming, emptyText: 'No upcoming bookings'),
+                    _BookingListTab(bookings: past, emptyText: 'No past bookings'),
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

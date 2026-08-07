@@ -6,8 +6,8 @@ import 'package:flutter/material.dart';
 class AppColors {
   AppColors._();
 
-  static const Color primary = Color(0xFF1DA1F2); // brand accent (sky blue)
-  static const Color primaryDark = Color(0xFF0D7FC4);
+  static const Color primary = Color(0xFF2D4042); // brand accent (dark slate teal)
+  static const Color primaryDark = Color(0xFF1B2829);
   static const Color secondary = Color(0xFFFFB020); // gospel-gold accent
   static const Color textPrimary = Color(0xFF1A1A1A);
   static const Color textSecondary = Color(0xFF5F6B7A);
@@ -22,6 +22,6 @@ class AppColors {
   static const Color statusPending = Color(0xFFF5A623);
   static const Color statusAccepted = Color(0xFF2ECC71);
   static const Color statusDeclined = Color(0xFFE74C3C);
-  static const Color statusCompleted = Color(0xFF1DA1F2);
+  static const Color statusCompleted = Color(0xFF2D4042);
   static const Color statusCancelled = Color(0xFF9AA5B1);
 }

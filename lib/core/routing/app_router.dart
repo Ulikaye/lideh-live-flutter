@@ -29,7 +29,7 @@ import '../../shared/widgets/loading_indicator.dart';
 import 'page_transitions.dart';
 
 final _publicRoutes = <String>{
-  '/', '/musicians', '/events', '/blog', '/login', '/register', '/about', '/contact', '/terms', '/privacy',
+  '/', '/musicians', '/events', '/blog', '/login', '/register', '/about', '/contact', '/terms', '/privacy', '/credits',
 };
 
 /// Any route not in [_publicRoutes] (and not a detail page nested under
@@ -113,6 +113,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(path: '/contact', builder: (_, __) => const StaticPage(type: StaticPageType.contact)),
           GoRoute(path: '/terms', builder: (_, __) => const StaticPage(type: StaticPageType.terms)),
           GoRoute(path: '/privacy', builder: (_, __) => const StaticPage(type: StaticPageType.privacy)),
+          GoRoute(path: '/credits', builder: (_, __) => const StaticPage(type: StaticPageType.credits)),
         ],
       ),
       GoRoute(path: '/login', builder: (_, s) => LoginScreen(redirectTo: s.uri.queryParameters['redirect'])),
