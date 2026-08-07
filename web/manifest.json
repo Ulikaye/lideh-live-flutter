@@ -1,11 +1,11 @@
-{
-    "name": "lideh_live_flutter",
-    "short_name": "lideh_live_flutter",
+﻿{
+    "name": "LiDeH Live",
+    "short_name": "LiDeH Live",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#1DA1F2",
+    "theme_color": "#1DA1F2",
+    "description": "Connecting Gospel Musicians with the Church",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
@@ -33,3 +33,4 @@
         }
     ]
 }
+
