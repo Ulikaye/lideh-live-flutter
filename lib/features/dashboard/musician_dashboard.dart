@@ -7,6 +7,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/booking_provider.dart';
 import '../../shared/widgets/error_widget.dart';
 import '../../shared/widgets/loading_indicator.dart';
+import '../../shared/widgets/profile_menu_button.dart';
 import '../bookings/widgets/booking_card.dart';
 
 /// Musician's operational home base: everything needed to manage
@@ -38,6 +39,7 @@ class _MusicianDashboardState extends ConsumerState<MusicianDashboard> with Sing
     return Scaffold(
       appBar: AppBar(
         title: const Text('Musician Dashboard'),
+        actions: const [ProfileMenuButton(), SizedBox(width: 8)],
         bottom: TabBar(
           controller: _tabController,
           tabs: const [Tab(text: 'Pending'), Tab(text: 'Upcoming'), Tab(text: 'Past')],

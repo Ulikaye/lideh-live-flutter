@@ -3,7 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/utils/responsive.dart';
 import '../../providers/musician_provider.dart';
 import '../../shared/widgets/error_widget.dart';
-import '../../shared/widgets/loading_indicator.dart';
+import '../../shared/widgets/profile_menu_button.dart';
+import '../../shared/widgets/skeleton_loaders.dart';
 import 'widgets/musician_card.dart';
 import 'widgets/filter_sheet.dart';
 
@@ -24,6 +25,8 @@ class MusicianListScreen extends ConsumerWidget {
             icon: const Icon(Icons.tune_rounded),
             onPressed: () => showMusicianFilterSheet(context, ref),
           ),
+          const ProfileMenuButton(),
+          const SizedBox(width: 8),
         ],
       ),
       body: Column(
@@ -49,7 +52,7 @@ class MusicianListScreen extends ConsumerWidget {
             ),
           Expanded(
             child: musiciansAsync.when(
-              loading: () => const LoadingIndicator(),
+              loading: () => CenteredContent(child: MusicianGridSkeleton(columns: columns)),
               error: (e, _) => AppErrorWidget(message: 'Failed to load musicians: $e'),
               data: (musicians) {
                 if (musicians.isEmpty) {

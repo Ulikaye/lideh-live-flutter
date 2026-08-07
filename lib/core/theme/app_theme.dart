@@ -1,6 +1,31 @@
 import 'package:flutter/material.dart';
 import '../constants/app_colors.dart';
 
+/// A gentle fade+slight-scale transition used for every route change,
+/// on every platform (web's default Zoom transition otherwise looks
+/// jumpy, and platform defaults are inconsistent between iOS/Android).
+class _FadeScalePageTransitionsBuilder extends PageTransitionsBuilder {
+  const _FadeScalePageTransitionsBuilder();
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    final curved = CurvedAnimation(parent: animation, curve: Curves.easeOut);
+    return FadeTransition(
+      opacity: curved,
+      child: ScaleTransition(
+        scale: Tween(begin: 0.98, end: 1.0).animate(curved),
+        child: child,
+      ),
+    );
+  }
+}
+
 /// Central Material 3 theme. Kept in one place so mobile, web, and
 /// desktop builds always render a consistent, professional brand.
 class AppTheme {
@@ -21,6 +46,15 @@ class AppTheme {
       colorScheme: colorScheme,
       scaffoldBackgroundColor: AppColors.background,
       fontFamily: 'Roboto',
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: _FadeScalePageTransitionsBuilder(),
+          TargetPlatform.iOS: _FadeScalePageTransitionsBuilder(),
+          TargetPlatform.macOS: _FadeScalePageTransitionsBuilder(),
+          TargetPlatform.windows: _FadeScalePageTransitionsBuilder(),
+          TargetPlatform.linux: _FadeScalePageTransitionsBuilder(),
+        },
+      ),
       appBarTheme: const AppBarTheme(
         backgroundColor: AppColors.surface,
         foregroundColor: AppColors.textPrimary,

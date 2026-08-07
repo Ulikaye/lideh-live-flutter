@@ -5,6 +5,8 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/strings.dart';
 import '../../core/utils/responsive.dart';
 import '../../providers/musician_provider.dart';
+import '../../shared/widgets/app_logo.dart';
+import '../../shared/widgets/profile_menu_button.dart';
 import 'widgets/featured_musicians.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -14,7 +16,14 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(AppStrings.appName),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const AppLogo(size: 28),
+            const SizedBox(width: 10),
+            Text(AppStrings.appName),
+          ],
+        ),
         actions: [
           if (Responsive.isDesktopOrTablet(context)) ...[
             TextButton(onPressed: () => context.go('/musicians'), child: const Text('Find Musicians')),
@@ -22,6 +31,8 @@ class HomeScreen extends ConsumerWidget {
             TextButton(onPressed: () => context.go('/blog'), child: const Text('Blog')),
             const SizedBox(width: 8),
           ],
+          const ProfileMenuButton(),
+          const SizedBox(width: 8),
         ],
       ),
       body: SingleChildScrollView(

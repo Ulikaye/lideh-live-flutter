@@ -45,21 +45,32 @@ class EmptyStateWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 56, color: AppColors.textSecondary.withValues(alpha: 0.5)),
-            const SizedBox(height: 16),
-            Text(title, style: const_titleStyle()),
-            if (subtitle != null) ...[
-              const SizedBox(height: 8),
-              Text(subtitle!, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.textSecondary)),
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeOut,
+      builder: (context, value, child) {
+        return Opacity(
+          opacity: value,
+          child: Transform.scale(scale: 0.92 + (0.08 * value), child: child),
+        );
+      },
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 56, color: AppColors.textSecondary.withValues(alpha: 0.5)),
+              const SizedBox(height: 16),
+              Text(title, style: const_titleStyle()),
+              if (subtitle != null) ...[
+                const SizedBox(height: 8),
+                Text(subtitle!, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.textSecondary)),
+              ],
+              if (action != null) ...[const SizedBox(height: 20), action!],
             ],
-            if (action != null) ...[const SizedBox(height: 20), action!],
-          ],
+          ),
         ),
       ),
     );

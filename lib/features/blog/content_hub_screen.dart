@@ -9,7 +9,8 @@ import '../../models/blog_category.dart';
 import '../../models/blog_post.dart';
 import '../../providers/blog_provider.dart';
 import '../../shared/widgets/error_widget.dart';
-import '../../shared/widgets/loading_indicator.dart';
+import '../../shared/widgets/skeleton_loaders.dart';
+import '../../shared/widgets/profile_menu_button.dart';
 
 class ContentHubScreen extends ConsumerWidget {
   const ContentHubScreen({super.key});
@@ -22,7 +23,10 @@ class ContentHubScreen extends ConsumerWidget {
     final isWide = Responsive.isDesktopOrTablet(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Content Hub')),
+      appBar: AppBar(
+        title: const Text('Content Hub'),
+        actions: const [ProfileMenuButton(), SizedBox(width: 8)],
+      ),
       body: CenteredContent(
         child: isWide
             ? Row(
@@ -100,12 +104,12 @@ class _PostsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final columns = Responsive.gridColumns(context).clamp(1, 2);
     return postsAsync.when(
-      loading: () => const LoadingIndicator(),
+      loading: () => BlogGridSkeleton(columns: columns),
       error: (e, _) => AppErrorWidget(message: 'Could not load posts'),
       data: (posts) {
         if (posts.isEmpty) return const EmptyStateWidget(title: 'No posts yet', icon: Icons.article_outlined);
-        final columns = Responsive.gridColumns(context).clamp(1, 2);
         return GridView.builder(
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: columns, mainAxisSpacing: 16, crossAxisSpacing: 16, childAspectRatio: 1.3),
           itemCount: posts.length,

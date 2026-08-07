@@ -8,7 +8,8 @@ import '../../core/utils/responsive.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/event_provider.dart';
 import '../../shared/widgets/error_widget.dart';
-import '../../shared/widgets/loading_indicator.dart';
+import '../../shared/widgets/profile_menu_button.dart';
+import '../../shared/widgets/skeleton_loaders.dart';
 
 class EventListScreen extends ConsumerWidget {
   const EventListScreen({super.key});
@@ -29,13 +30,15 @@ class EventListScreen extends ConsumerWidget {
               icon: const Icon(Icons.add),
               label: const Text('New Event'),
             ),
+          const ProfileMenuButton(),
+          const SizedBox(width: 8),
         ],
       ),
       floatingActionButton: canCreate && Responsive.isMobile(context)
           ? FloatingActionButton(onPressed: () => context.go('/events/create'), child: const Icon(Icons.add))
           : null,
       body: eventsAsync.when(
-        loading: () => const LoadingIndicator(),
+        loading: () => const CenteredContent(child: EventListSkeleton()),
         error: (e, _) => AppErrorWidget(message: 'Could not load events'),
         data: (events) {
           if (events.isEmpty) {

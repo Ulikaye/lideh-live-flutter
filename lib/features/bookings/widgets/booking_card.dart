@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/strings.dart';
 import '../../../models/booking.dart';
+import '../../../shared/widgets/pressable_scale.dart';
 
 Color statusColor(BookingStatus status) {
   switch (status) {
@@ -29,7 +30,8 @@ class BookingCard extends StatelessWidget {
     final color = statusColor(booking.status);
     final dateStr = DateFormat('MMM d, yyyy').format(booking.eventDate);
 
-    return Card(
+    return PressableScale(
+      child: Card(
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: () => context.go('/bookings/${booking.id}'),
@@ -60,6 +62,6 @@ class BookingCard extends StatelessWidget {
           ),
         ),
       ),
-    );
+    ));
   }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../models/musician.dart';
+import '../../../shared/widgets/pressable_scale.dart';
 import '../../../shared/widgets/star_rating.dart';
 
 class MusicianCard extends StatelessWidget {
@@ -10,10 +11,11 @@ class MusicianCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () => context.go('/musicians/${musician.uid}'),
+    return PressableScale(
+      child: Card(
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => context.go('/musicians/${musician.uid}'),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -82,6 +84,6 @@ class MusicianCard extends StatelessWidget {
           ),
         ),
       ),
-    );
+    ));
   }
 }

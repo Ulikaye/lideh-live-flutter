@@ -24,6 +24,9 @@ import '../../features/dashboard/organizer_dashboard.dart';
 import '../../features/profile/profile_screen.dart';
 import '../../features/profile/edit_profile_screen.dart';
 import '../../features/static/static_pages.dart';
+import '../../shared/widgets/error_widget.dart';
+import '../../shared/widgets/loading_indicator.dart';
+import 'page_transitions.dart';
 
 final _publicRoutes = <String>{
   '/', '/musicians', '/events', '/blog', '/login', '/register', '/about', '/contact', '/terms', '/privacy',
@@ -73,18 +76,39 @@ final routerProvider = Provider<GoRouter>((ref) {
         routes: [
           GoRoute(path: '/', builder: (_, __) => const HomeScreen()),
           GoRoute(path: '/musicians', builder: (_, __) => const MusicianListScreen()),
-          GoRoute(path: '/musicians/:id', builder: (_, s) => MusicianProfileScreen(musicianId: s.pathParameters['id']!)),
+          GoRoute(
+            path: '/musicians/:id',
+            pageBuilder: (_, s) => slideTransitionPage(state: s, child: MusicianProfileScreen(musicianId: s.pathParameters['id']!)),
+          ),
           GoRoute(path: '/events', builder: (_, __) => const EventListScreen()),
-          GoRoute(path: '/events/create', builder: (_, __) => const CreateEventScreen()),
-          GoRoute(path: '/events/:id', builder: (_, s) => EventDetailScreen(eventId: s.pathParameters['id']!)),
+          GoRoute(
+            path: '/events/create',
+            pageBuilder: (_, s) => slideTransitionPage(state: s, child: const CreateEventScreen()),
+          ),
+          GoRoute(
+            path: '/events/:id',
+            pageBuilder: (_, s) => slideTransitionPage(state: s, child: EventDetailScreen(eventId: s.pathParameters['id']!)),
+          ),
           GoRoute(path: '/blog', builder: (_, __) => const ContentHubScreen()),
-          GoRoute(path: '/blog/:id', builder: (_, s) => BlogDetailScreen(postId: s.pathParameters['id']!)),
+          GoRoute(
+            path: '/blog/:id',
+            pageBuilder: (_, s) => slideTransitionPage(state: s, child: BlogDetailScreen(postId: s.pathParameters['id']!)),
+          ),
           GoRoute(path: '/dashboard', builder: (_, __) => const DashboardRouterScreen()),
           GoRoute(path: '/bookings', builder: (_, __) => const MyBookingsScreen()),
-          GoRoute(path: '/bookings/create/:musicianId', builder: (_, s) => CreateBookingScreen(musicianId: s.pathParameters['musicianId']!)),
-          GoRoute(path: '/bookings/:id', builder: (_, s) => BookingDetailScreen(bookingId: s.pathParameters['id']!)),
+          GoRoute(
+            path: '/bookings/create/:musicianId',
+            pageBuilder: (_, s) => slideTransitionPage(state: s, child: CreateBookingScreen(musicianId: s.pathParameters['musicianId']!)),
+          ),
+          GoRoute(
+            path: '/bookings/:id',
+            pageBuilder: (_, s) => slideTransitionPage(state: s, child: BookingDetailScreen(bookingId: s.pathParameters['id']!)),
+          ),
           GoRoute(path: '/profile', builder: (_, __) => const ProfileScreen()),
-          GoRoute(path: '/profile/edit', builder: (_, __) => const EditProfileScreen()),
+          GoRoute(
+            path: '/profile/edit',
+            pageBuilder: (_, s) => slideTransitionPage(state: s, child: const EditProfileScreen()),
+          ),
           GoRoute(path: '/about', builder: (_, __) => const StaticPage(type: StaticPageType.about)),
           GoRoute(path: '/contact', builder: (_, __) => const StaticPage(type: StaticPageType.contact)),
           GoRoute(path: '/terms', builder: (_, __) => const StaticPage(type: StaticPageType.terms)),
@@ -112,9 +136,18 @@ class DashboardRouterScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final profile = ref.watch(currentUserProfileProvider).value;
-    if (profile == null) return const SizedBox.shrink();
-    if (profile.userType == UserType.musician) return const MusicianDashboard();
-    return const OrganizerDashboard();
+    final profileAsync = ref.watch(currentUserProfileProvider);
+
+    return profileAsync.when(
+      loading: () => const Scaffold(body: LoadingIndicator(message: 'Loading your dashboard...')),
+      error: (e, _) => Scaffold(body: AppErrorWidget(message: 'Could not load your profile: $e')),
+      data: (profile) {
+        if (profile == null) {
+          return const Scaffold(body: AppErrorWidget(message: 'No profile found for this account. Try signing out and back in.'));
+        }
+        if (profile.userType == UserType.musician) return const MusicianDashboard();
+        return const OrganizerDashboard();
+      },
+    );
   }
 }
