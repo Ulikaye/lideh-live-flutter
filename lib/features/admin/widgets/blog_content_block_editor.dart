@@ -30,7 +30,7 @@ class BlogContentBlockEditor extends ConsumerWidget {
 
   const BlogContentBlockEditor({super.key, required this.blocks, required this.onChanged});
 
-  Future<void> _pickImageFor(WidgetRef ref, EditableBlock block) async {
+  Future<void> _pickImageFor(BuildContext context, WidgetRef ref, EditableBlock block) async {
     final picker = ImagePicker();
     final picked = await picker.pickImage(source: ImageSource.gallery, maxWidth: 1000, imageQuality: 85);
     if (picked == null) return;
@@ -45,6 +45,15 @@ class BlogContentBlockEditor extends ConsumerWidget {
             extension: 'jpg',
           );
       block.imageUrl = url;
+    } catch (e) {
+      // Previously failed silently here — a permission-denied error
+      // (or any other upload failure) would just reset the spinner
+      // with no explanation, looking exactly like an unresponsive UI.
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Image upload failed: $e'), backgroundColor: AppColors.danger),
+        );
+      }
     } finally {
       block.uploading = false;
       onChanged();
@@ -80,7 +89,7 @@ class BlogContentBlockEditor extends ConsumerWidget {
             onMoveUp: i > 0 ? () => _move(i, -1) : null,
             onMoveDown: i < blocks.length - 1 ? () => _move(i, 1) : null,
             onDelete: () => _removeBlock(i),
-            onPickImage: () => _pickImageFor(ref, blocks[i]),
+            onPickImage: () => _pickImageFor(context, ref, blocks[i]),
             onTextChanged: onChanged,
           ),
           const SizedBox(height: 10),

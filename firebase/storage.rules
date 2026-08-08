@@ -4,7 +4,8 @@ rules_version = '2';
 //   profile_pictures/{fileName}  — any signed-in user's own avatar
 //   musician_media/{fileName}    — musician performance photos/clips
 //   event_images/{fileName}      — organizer event cover images
-//   blog_images/{fileName}       — CMS/admin-managed, no client writes
+//   blog_images/{fileName}       — admin-only, uploaded from the in-app
+//                                  blog editor (see AdminBlogEditorScreen)
 //
 // Files are named with a generated UUID (see StorageService), so there
 // is no per-owner subfolder to check ownership against on write; write
@@ -33,6 +34,15 @@ service firebase.storage {
       return request.resource.size < mb * 1024 * 1024;
     }
 
+    // Cross-service lookup into Firestore to confirm the caller's
+    // users/{uid}.user_type is 'admin' — mirrors the redirect guard
+    // already enforced client-side in app_router.dart for /admin
+    // routes, so the same rule is now enforced server-side too.
+    function isAdmin() {
+      return isSignedIn() &&
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.user_type == 'admin';
+    }
+
     match /profile_pictures/{fileName} {
       allow read: if true;
       allow write: if isSignedIn() && isImage() && underSizeLimit(5);
@@ -50,7 +60,7 @@ service firebase.storage {
 
     match /blog_images/{fileName} {
       allow read: if true;
-      allow write: if false; // managed via Admin SDK / CMS backend only
+      allow write: if isAdmin() && isImage() && underSizeLimit(5);
     }
   }
 }
