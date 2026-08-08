@@ -5,6 +5,7 @@ import 'firebase_options.dart';
 import 'core/theme/app_theme.dart';
 import 'core/routing/app_router.dart';
 import 'core/constants/strings.dart';
+import 'providers/auth_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,6 +19,17 @@ class LidehLiveApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
+
+    // Registers this device's push token against the signed-in user's
+    // profile exactly once per login — previously FcmService existed
+    // but was never actually called from anywhere in the app.
+    ref.listen(authStateProvider, (previous, next) {
+      final user = next.value;
+      if (user != null && previous?.value?.uid != user.uid) {
+        ref.read(fcmServiceProvider).initForUser(user.uid);
+      }
+    });
+
     return MaterialApp.router(
       title: AppStrings.appName,
       debugShowCheckedModeBanner: false,

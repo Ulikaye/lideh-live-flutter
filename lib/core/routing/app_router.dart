@@ -24,8 +24,7 @@ import '../../features/dashboard/organizer_dashboard.dart';
 import '../../features/profile/profile_screen.dart';
 import '../../features/profile/edit_profile_screen.dart';
 import '../../features/dashboard/edit_musician_details_screen.dart';
-import '../../features/admin/admin_blog_list_screen.dart';
-import '../../features/admin/admin_blog_editor_screen.dart';
+import '../../features/notifications/notification_inbox_screen.dart';
 import '../../features/static/static_pages.dart';
 import '../../shared/widgets/error_widget.dart';
 import '../../shared/widgets/loading_indicator.dart';
@@ -51,9 +50,6 @@ final routerProvider = Provider<GoRouter>((ref) {
   ref.listen(authStateProvider, (prev, next) {
     authNotifier.value = !authNotifier.value; // force GoRouter to re-evaluate redirects
   });
-  ref.listen(currentUserProfileProvider, (prev, next) {
-    authNotifier.value = !authNotifier.value; // re-evaluate once role/admin status loads
-  });
 
   return GoRouter(
     initialLocation: '/',
@@ -70,12 +66,6 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
       if (isLoggedIn && goingToAuthPages) {
         return '/';
-      }
-      if (path.startsWith('/admin')) {
-        final profile = ref.read(currentUserProfileProvider).value;
-        if (profile == null || profile.userType != UserType.admin) {
-          return '/';
-        }
       }
       return null;
     },
@@ -125,14 +115,9 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/musician-details/edit',
             pageBuilder: (_, s) => slideTransitionPage(state: s, child: const EditMusicianDetailsScreen()),
           ),
-          GoRoute(path: '/admin/blog', builder: (_, __) => const AdminBlogListScreen()),
           GoRoute(
-            path: '/admin/blog/new',
-            pageBuilder: (_, s) => slideTransitionPage(state: s, child: const AdminBlogEditorScreen()),
-          ),
-          GoRoute(
-            path: '/admin/blog/:id/edit',
-            pageBuilder: (_, s) => slideTransitionPage(state: s, child: AdminBlogEditorScreen(postId: s.pathParameters['id'])),
+            path: '/notifications',
+            pageBuilder: (_, s) => slideTransitionPage(state: s, child: const NotificationInboxScreen()),
           ),
           GoRoute(path: '/about', builder: (_, __) => const StaticPage(type: StaticPageType.about)),
           GoRoute(path: '/contact', builder: (_, __) => const StaticPage(type: StaticPageType.contact)),
@@ -151,8 +136,8 @@ final routerProvider = Provider<GoRouter>((ref) {
 int _indexForPath(String path) {
   if (path.startsWith('/musicians')) return 1;
   if (path.startsWith('/events')) return 2;
-  if (path.startsWith('/blog') && !path.startsWith('/admin')) return 3;
-  if (path.startsWith('/dashboard') || path.startsWith('/admin')) return 4;
+  if (path.startsWith('/blog')) return 3;
+  if (path.startsWith('/dashboard')) return 4;
   return 0;
 }
 

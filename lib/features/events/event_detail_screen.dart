@@ -81,6 +81,7 @@ class EventDetailScreen extends ConsumerWidget {
       venue: event.location,
       message: 'I would like to apply to perform at this event.',
       status: BookingStatus.pending,
+      createdBy: musicianId,
     );
     final id = await ref.read(firestoreServiceProvider).createBooking(booking);
     if (context.mounted) context.go('/bookings/$id');

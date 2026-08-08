@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../firebase/auth_service.dart';
+import '../firebase/fcm_service.dart';
 import '../firebase/firestore_service.dart';
 import '../firebase/storage_service.dart';
 import '../models/user_profile.dart';
@@ -8,6 +9,7 @@ import '../models/user_profile.dart';
 final authServiceProvider = Provider<AuthService>((ref) => AuthService());
 final firestoreServiceProvider = Provider<FirestoreService>((ref) => FirestoreService());
 final storageServiceProvider = Provider<StorageService>((ref) => StorageService());
+final fcmServiceProvider = Provider<FcmService>((ref) => FcmService());
 
 /// Live Firebase auth state — drives route protection in app_router.dart.
 final authStateProvider = StreamProvider<User?>((ref) {

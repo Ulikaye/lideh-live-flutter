@@ -7,6 +7,7 @@ import '../../providers/booking_provider.dart';
 import '../../providers/event_provider.dart';
 import '../../shared/widgets/error_widget.dart';
 import '../../shared/widgets/loading_indicator.dart';
+import '../../shared/widgets/notification_bell_button.dart';
 import '../../shared/widgets/profile_menu_button.dart';
 import '../bookings/widgets/booking_card.dart';
 
@@ -40,6 +41,7 @@ class _OrganizerDashboardState extends ConsumerState<OrganizerDashboard> with Si
         bottom: TabBar(controller: _tabController, tabs: const [Tab(text: 'My Bookings'), Tab(text: 'My Events')]),
         actions: [
           IconButton(icon: const Icon(Icons.add_circle_outline), tooltip: 'New Event', onPressed: () => context.go('/events/create')),
+          const NotificationBellButton(),
           const ProfileMenuButton(),
           const SizedBox(width: 8),
         ],

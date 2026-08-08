@@ -202,6 +202,99 @@ ${urls.map((u) => `  <url><loc>${baseUrl}${u}</loc></url>`).join('\n')}
   res.status(200).send(xml);
 });
 // ---------------------------------------------------------------------------
+// Booking notifications
+//
+// Writes a notifications/{autoId} document for the recipient (used by
+// the in-app notification bell/inbox), and best-effort sends a push
+// notification via FCM if the recipient has a registered device token.
+// A missing/stale FCM token never fails the whole trigger — the
+// Firestore notification document is the source of truth; push is a
+// bonus on top of it.
+// ---------------------------------------------------------------------------
+async function notifyUser({ userId, title, body, bookingId }) {
+  await db.collection('notifications').add({
+    user_id: userId,
+    title,
+    body,
+    booking_id: bookingId,
+    read: false,
+    created_at: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  try {
+    const userDoc = await db.collection('users').doc(userId).get();
+    const token = userDoc.exists ? userDoc.data().fcm_token : null;
+    if (token) {
+      await admin.messaging().send({
+        token,
+        notification: { title, body },
+        data: { booking_id: bookingId || '' },
+      });
+    }
+  } catch (e) {
+    functions.logger.warn('FCM push failed (notification document was still saved)', e);
+  }
+}
+
+exports.onBookingCreated = functions.firestore
+  .document('bookings/{bookingId}')
+  .onCreate(async (snap, context) => {
+    const booking = snap.data();
+    const bookingId = context.params.bookingId;
+
+    // Always notify whichever party did NOT initiate the booking.
+    const recipientId = booking.created_by === booking.musician_id ? booking.organizer_id : booking.musician_id;
+    const isNotifyingMusician = recipientId === booking.musician_id;
+
+    await notifyUser({
+      userId: recipientId,
+      title: isNotifyingMusician ? 'New Booking Request' : 'New Performance Application',
+      body: isNotifyingMusician
+        ? `You have a new booking request for "${booking.event_name}".`
+        : `A musician applied to perform at "${booking.event_name}".`,
+      bookingId,
+    });
+  });
+
+exports.onBookingUpdated = functions.firestore
+  .document('bookings/{bookingId}')
+  .onUpdate(async (change, context) => {
+    const before = change.before.data();
+    const after = change.after.data();
+    const bookingId = context.params.bookingId;
+
+    if (before.status === after.status) return; // only react to actual status changes
+
+    const messages = {
+      accepted: {
+        userId: after.organizer_id,
+        title: 'Booking Accepted',
+        body: `Your booking request for "${after.event_name}" was accepted.`,
+      },
+      declined: {
+        userId: after.organizer_id,
+        title: 'Booking Declined',
+        body: `Your booking request for "${after.event_name}" was declined.`,
+      },
+      completed: {
+        userId: after.organizer_id,
+        title: 'Booking Completed',
+        body: `"${after.event_name}" is marked complete. Leave a review for the musician!`,
+      },
+      cancelled: {
+        userId: after.musician_id,
+        title: 'Booking Cancelled',
+        body: `The booking for "${after.event_name}" was cancelled.`,
+      },
+    };
+
+    const message = messages[after.status];
+    if (message) {
+      await notifyUser({ ...message, bookingId });
+    }
+  });
+
+// ---------------------------------------------------------------------------
 // Main router — bot detection + snapshot serving for musician/blog/event/home
 // ---------------------------------------------------------------------------
 exports.ssrRouter = functions.https.onRequest(async (req, res) => {

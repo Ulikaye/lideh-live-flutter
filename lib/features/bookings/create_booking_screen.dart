@@ -60,6 +60,7 @@ class _CreateBookingScreenState extends ConsumerState<CreateBookingScreen> {
       message: _messageController.text.trim(),
       contactPhone: _phoneController.text.trim(),
       status: BookingStatus.pending,
+      createdBy: organizerId,
     );
     try {
       final id = await ref.read(firestoreServiceProvider).createBooking(booking);

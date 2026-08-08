@@ -8,6 +8,7 @@ import '../../providers/musician_provider.dart';
 import '../../shared/widgets/app_icon_asset.dart';
 import '../../shared/widgets/app_logo.dart';
 import '../../shared/widgets/app_footer.dart';
+import '../../shared/widgets/notification_bell_button.dart';
 import '../../shared/widgets/profile_menu_button.dart';
 import 'widgets/featured_musicians.dart';
 
@@ -28,17 +29,12 @@ class HomeScreen extends ConsumerWidget {
         ),
         actions: [
           if (Responsive.isDesktopOrTablet(context)) ...[
-            TextButton(
-                onPressed: () => context.go('/musicians'),
-                child: const Text('Find Musicians')),
-            TextButton(
-                onPressed: () => context.go('/events'),
-                child: const Text('Events')),
-            TextButton(
-                onPressed: () => context.go('/blog'),
-                child: const Text('Blog')),
+            TextButton(onPressed: () => context.go('/musicians'), child: const Text('Find Musicians')),
+            TextButton(onPressed: () => context.go('/events'), child: const Text('Events')),
+            TextButton(onPressed: () => context.go('/blog'), child: const Text('Blog')),
             const SizedBox(width: 8),
           ],
+          const NotificationBellButton(),
           const ProfileMenuButton(),
           const SizedBox(width: 8),
         ],
@@ -52,8 +48,7 @@ class HomeScreen extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Featured Musicians',
-                      style: Theme.of(context).textTheme.headlineSmall),
+                  Text('Featured Musicians', style: Theme.of(context).textTheme.headlineSmall),
                   const SizedBox(height: 16),
                   const FeaturedMusicians(),
                   const SizedBox(height: 40),
@@ -96,12 +91,9 @@ class _HeroSectionState extends ConsumerState<_HeroSection> {
           child: Column(
             children: [
               Text(
-                'Discover the Sound\n for your Event',
+                'Find the Right Gospel Musician\nfor Your Next Event',
                 textAlign: TextAlign.center,
-                style: Theme.of(context)
-                    .textTheme
-                    .displaySmall
-                    ?.copyWith(color: Colors.white, fontSize: isWide ? 40 : 28),
+                style: Theme.of(context).textTheme.displaySmall?.copyWith(color: Colors.white, fontSize: isWide ? 40 : 28),
               ),
               const SizedBox(height: 12),
               Text(
@@ -111,20 +103,16 @@ class _HeroSectionState extends ConsumerState<_HeroSection> {
               ),
               const SizedBox(height: 28),
               Container(
-                decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(14)),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)),
                 child: TextField(
                   controller: _searchController,
                   decoration: InputDecoration(
                     hintText: 'Search by city or region...',
                     prefixIcon: const Icon(Icons.search),
                     border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(
-                        vertical: 16, horizontal: 16),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
                     suffixIcon: IconButton(
-                      icon: const Icon(Icons.arrow_forward_rounded,
-                          color: AppColors.primary),
+                      icon: const Icon(Icons.arrow_forward_rounded, color: AppColors.primary),
                       onPressed: () => _search(context),
                     ),
                   ),
@@ -140,8 +128,7 @@ class _HeroSectionState extends ConsumerState<_HeroSection> {
 
   void _search(BuildContext context) {
     final query = _searchController.text.trim();
-    ref.read(musicianFilterProvider.notifier).state =
-        MusicianFilter(location: query.isEmpty ? null : query);
+    ref.read(musicianFilterProvider.notifier).state = MusicianFilter(location: query.isEmpty ? null : query);
     context.go('/musicians');
   }
 }
@@ -151,21 +138,9 @@ class _QuickLinksSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final columns = Responsive.gridColumns(context).clamp(1, 3);
     final items = [
-      _QuickLink(
-          iconName: 'calendar',
-          title: 'Upcoming Events',
-          subtitle: 'See what\'s happening near you',
-          route: '/events'),
-      _QuickLink(
-          iconName: 'blog',
-          title: 'Content Hub',
-          subtitle: 'Stories, tips and testimonials',
-          route: '/blog'),
-      _QuickLink(
-          iconName: 'music',
-          title: 'Browse Musicians',
-          subtitle: 'Explore the full directory',
-          route: '/musicians'),
+      _QuickLink(iconName: 'calendar', title: 'Upcoming Events', subtitle: 'See what\'s happening near you', route: '/events'),
+      _QuickLink(iconName: 'blog', title: 'Content Hub', subtitle: 'Stories, tips and testimonials', route: '/blog'),
+      _QuickLink(iconName: 'music', title: 'Browse Musicians', subtitle: 'Explore the full directory', route: '/musicians'),
     ];
     return GridView.count(
       crossAxisCount: columns,
@@ -184,11 +159,7 @@ class _QuickLink {
   final String title;
   final String subtitle;
   final String route;
-  _QuickLink(
-      {required this.iconName,
-      required this.title,
-      required this.subtitle,
-      required this.route});
+  _QuickLink({required this.iconName, required this.title, required this.subtitle, required this.route});
 }
 
 class _QuickLinkCard extends StatelessWidget {
@@ -210,9 +181,7 @@ class _QuickLinkCard extends StatelessWidget {
               const SizedBox(height: 12),
               Text(item.title, style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 4),
-              Text(item.subtitle,
-                  style: const TextStyle(
-                      color: AppColors.textSecondary, fontSize: 13)),
+              Text(item.subtitle, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
             ],
           ),
         ),
