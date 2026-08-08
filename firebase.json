@@ -1,4 +1,4 @@
-﻿{
+{
   "firestore": {
     "rules": "firebase/firestore.rules",
     "indexes": "firebase/firestore.indexes.json"
@@ -6,10 +6,18 @@
   "storage": {
     "rules": "firebase/storage.rules"
   },
+  "functions": {
+    "source": "functions"
+  },
   "hosting": {
     "public": "build/web",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [
+      { "source": "/", "function": "ssrRouter" },
+      { "source": "/musicians/**", "function": "ssrRouter" },
+      { "source": "/blog/**", "function": "ssrRouter" },
+      { "source": "/events/**", "function": "ssrRouter" },
+      { "source": "/sitemap.xml", "function": "sitemap" },
       { "source": "**", "destination": "/index.html" }
     ]
   }

@@ -41,3 +41,5 @@ linux/flutter/ephemeral/
 # OS
 .DS_Store
 Thumbs.db
+
+functions/node_modules/
