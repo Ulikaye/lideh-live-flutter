@@ -103,6 +103,15 @@ class _AdminBlogEditorScreenState extends ConsumerState<AdminBlogEditorScreen> {
         await firestore.createBlogPost(post);
       }
       if (mounted) context.go('/admin/blog');
+    } catch (e) {
+      // Previously uncaught here — a permission-denied error (or any
+      // other save failure) would just reset the spinner with the
+      // form still on screen and zero explanation of what happened.
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not save post: $e'), backgroundColor: AppColors.danger),
+        );
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }

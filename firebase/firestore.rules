@@ -15,12 +15,16 @@ rules_version = '2';
 //   may create the review, exactly once, and only after the booking is
 //   marked completed.
 //
-// Admin operations (managing skills/categories, moderating content,
-// verifying users) are expected to run via the Firebase Admin SDK
-// (Cloud Functions or a trusted backend), which bypasses these rules
-// entirely — there is intentionally no client-side "isAdmin" path here
-// because a custom claim could be spoofed if the app tried to check it
-// client-side, whereas Admin SDK service credentials cannot be.
+// Admin operations (managing skills/categories, blog content,
+// moderating content, verifying users) can now be performed by any
+// account with users/{uid}.user_type == 'admin', enforced via the
+// isAdmin() lookup below. This is not spoofable client-side — it's a
+// server-side rule evaluation reading the actual stored document, the
+// same mechanism isOwner() and the review-eligibility check already
+// rely on. There is still no client path to ever set user_type to
+// 'admin' in the first place (see the users/{uid} update rule), so an
+// account can only become an admin via the Firebase Console or Admin
+// SDK, never through the app itself.
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -31,6 +35,20 @@ service cloud.firestore {
 
     function isOwner(uid) {
       return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // Checks the caller's own users/{uid} doc for user_type == 'admin'.
+    // Used to gate the in-app blog management screens at the data
+    // layer, mirroring the redirect guard already enforced client-side
+    // in app_router.dart for /admin routes.
+    function isAdmin() {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.user_type == 'admin';
+    }
+
+    function isAdmin() {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.user_type == 'admin';
     }
 
     // ---------------- Users ----------------
@@ -110,12 +128,12 @@ service cloud.firestore {
     // ---------------- Blog ----------------
     match /blogCategories/{categoryId} {
       allow read: if true;
-      allow write: if false; // managed via Admin SDK / console only
+      allow write: if isAdmin();
     }
 
     match /blogPosts/{postId} {
       allow read: if resource.data.is_published == true || isSignedIn();
-      allow write: if false; // published via Admin SDK / CMS backend only
+      allow write: if isAdmin();
     }
 
     // ---------------- Notifications ----------------
