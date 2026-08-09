@@ -135,7 +135,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                 state: s, child: const AdminBlogEditorScreen()),
           ),
           GoRoute(
-            path: '/admin/blog/edit/:id',
+            path: '/admin/blog/:id/edit',
             pageBuilder: (_, s) => slideTransitionPage(
                 state: s,
                 child: AdminBlogEditorScreen(postId: s.pathParameters['id'])),

@@ -21,7 +21,8 @@ class AdminBlogEditorScreen extends ConsumerStatefulWidget {
   bool get isEditing => postId != null;
 
   @override
-  ConsumerState<AdminBlogEditorScreen> createState() => _AdminBlogEditorScreenState();
+  ConsumerState<AdminBlogEditorScreen> createState() =>
+      _AdminBlogEditorScreenState();
 }
 
 class _AdminBlogEditorScreenState extends ConsumerState<AdminBlogEditorScreen> {
@@ -46,7 +47,8 @@ class _AdminBlogEditorScreenState extends ConsumerState<AdminBlogEditorScreen> {
     _categoryId = post.categoryId;
     _featuredImageUrl = post.featuredImageUrl;
     _isPublished = post.isPublished;
-    _blocks.addAll(post.contentBlocks.map((b) => EditableBlock(type: b.type, text: b.text, imageUrl: b.imageUrl)));
+    _blocks.addAll(post.contentBlocks.map((b) =>
+        EditableBlock(type: b.type, text: b.text, imageUrl: b.imageUrl)));
     _initialized = true;
   }
 
@@ -58,7 +60,8 @@ class _AdminBlogEditorScreenState extends ConsumerState<AdminBlogEditorScreen> {
 
   Future<void> _pickFeaturedImage() async {
     final picker = ImagePicker();
-    final picked = await picker.pickImage(source: ImageSource.gallery, maxWidth: 1200, imageQuality: 85);
+    final picked = await picker.pickImage(
+        source: ImageSource.gallery, maxWidth: 1200, imageQuality: 85);
     if (picked == null) return;
 
     setState(() => _uploadingFeatured = true);
@@ -70,6 +73,14 @@ class _AdminBlogEditorScreenState extends ConsumerState<AdminBlogEditorScreen> {
             extension: 'jpg',
           );
       setState(() => _featuredImageUrl = url);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Could not upload image: $e'),
+              backgroundColor: AppColors.danger),
+        );
+      }
     } finally {
       if (mounted) setState(() => _uploadingFeatured = false);
     }
@@ -85,11 +96,15 @@ class _AdminBlogEditorScreenState extends ConsumerState<AdminBlogEditorScreen> {
     final post = BlogPost(
       id: widget.postId ?? '',
       title: _titleController.text.trim(),
-      slug: _slugController.text.trim().isEmpty ? _slugify(_titleController.text) : _slugController.text.trim(),
+      slug: _slugController.text.trim().isEmpty
+          ? _slugify(_titleController.text)
+          : _slugController.text.trim(),
       authorId: authorId,
       categoryId: _categoryId,
       featuredImageUrl: _featuredImageUrl,
-      excerpt: _excerptController.text.trim().isEmpty ? null : _excerptController.text.trim(),
+      excerpt: _excerptController.text.trim().isEmpty
+          ? null
+          : _excerptController.text.trim(),
       content: '',
       contentBlocks: _blocks.map((b) => b.toBlock()).toList(),
       isPublished: _isPublished,
@@ -109,7 +124,9 @@ class _AdminBlogEditorScreenState extends ConsumerState<AdminBlogEditorScreen> {
       // form still on screen and zero explanation of what happened.
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not save post: $e'), backgroundColor: AppColors.danger),
+          SnackBar(
+              content: Text('Could not save post: $e'),
+              backgroundColor: AppColors.danger),
         );
       }
     } finally {
@@ -140,14 +157,20 @@ class _AdminBlogEditorScreenState extends ConsumerState<AdminBlogEditorScreen> {
                         child: _uploadingFeatured
                             ? const Center(child: CircularProgressIndicator())
                             : _featuredImageUrl != null
-                                ? Image.network(_featuredImageUrl!, fit: BoxFit.cover)
+                                ? Image.network(_featuredImageUrl!,
+                                    fit: BoxFit.cover)
                                 : const Center(
                                     child: Column(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        Icon(Icons.add_photo_alternate_outlined, size: 32, color: AppColors.textSecondary),
+                                        Icon(Icons.add_photo_alternate_outlined,
+                                            size: 32,
+                                            color: AppColors.textSecondary),
                                         SizedBox(height: 8),
-                                        Text('Tap to upload a featured image', style: TextStyle(color: AppColors.textSecondary)),
+                                        Text('Tap to upload a featured image',
+                                            style: TextStyle(
+                                                color:
+                                                    AppColors.textSecondary)),
                                       ],
                                     ),
                                   ),
@@ -159,26 +182,34 @@ class _AdminBlogEditorScreenState extends ConsumerState<AdminBlogEditorScreen> {
                 TextFormField(
                   controller: _titleController,
                   decoration: const InputDecoration(labelText: 'Title'),
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Title is required' : null,
+                  validator: (v) => (v == null || v.trim().isEmpty)
+                      ? 'Title is required'
+                      : null,
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _slugController,
-                  decoration: const InputDecoration(labelText: 'Slug (leave blank to auto-generate)'),
+                  decoration: const InputDecoration(
+                      labelText: 'Slug (leave blank to auto-generate)'),
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
                   controller: _excerptController,
                   maxLines: 2,
-                  decoration: const InputDecoration(labelText: 'Excerpt (short teaser)', alignLabelWithHint: true),
+                  decoration: const InputDecoration(
+                      labelText: 'Excerpt (short teaser)',
+                      alignLabelWithHint: true),
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String?>(
                   value: _categoryId,
-                  decoration: const InputDecoration(labelText: 'Category (optional)'),
+                  decoration:
+                      const InputDecoration(labelText: 'Category (optional)'),
                   items: [
-                    const DropdownMenuItem<String?>(value: null, child: Text('No category')),
-                    ...categories.map((c) => DropdownMenuItem<String?>(value: c.id, child: Text(c.name))),
+                    const DropdownMenuItem<String?>(
+                        value: null, child: Text('No category')),
+                    ...categories.map((c) => DropdownMenuItem<String?>(
+                        value: c.id, child: Text(c.name))),
                   ],
                   onChanged: (v) => setState(() => _categoryId = v),
                 ),
@@ -186,20 +217,28 @@ class _AdminBlogEditorScreenState extends ConsumerState<AdminBlogEditorScreen> {
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Published'),
-                  subtitle: Text(_isPublished ? 'Visible to everyone' : 'Draft — only visible here'),
+                  subtitle: Text(_isPublished
+                      ? 'Visible to everyone'
+                      : 'Draft — only visible here'),
                   value: _isPublished,
                   onChanged: (v) => setState(() => _isPublished = v),
                 ),
                 const Divider(height: 32),
                 Text('Body', style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: 12),
-                BlogContentBlockEditor(blocks: _blocks, onChanged: () => setState(() {})),
+                BlogContentBlockEditor(
+                    blocks: _blocks, onChanged: () => setState(() {})),
                 const SizedBox(height: 28),
                 ElevatedButton(
                   onPressed: _saving ? null : _save,
                   child: _saving
-                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : Text(widget.isEditing ? 'Save Changes' : 'Publish Post'),
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white))
+                      : Text(
+                          widget.isEditing ? 'Save Changes' : 'Publish Post'),
                 ),
               ],
             ),
@@ -227,7 +266,8 @@ class _AdminBlogEditorScreenState extends ConsumerState<AdminBlogEditorScreen> {
             loading: () => const LoadingIndicator(),
             error: (e, _) => Center(child: Text('Error: $e')),
             data: (post) {
-              if (post == null) return const Center(child: Text('Post not found'));
+              if (post == null)
+                return const Center(child: Text('Post not found'));
               _initFromPost(post);
               return _buildForm(context, categories);
             },
