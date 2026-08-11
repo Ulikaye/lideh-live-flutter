@@ -19,8 +19,11 @@ final ecardByIdProvider = StreamProvider.family<Ecard?, String>((ref, id) {
   return ref.watch(firestoreServiceProvider).watchEcard(id);
 });
 
-final ecardForEventProvider = StreamProvider.family<Ecard?, String>((ref, eventId) {
-  return ref.watch(firestoreServiceProvider).watchEcardForEvent(eventId);
+/// Takes (eventId, organizerId) — see watchEcardForEvent's doc comment
+/// for why organizerId has to be passed through to the query itself,
+/// not just checked after the fact.
+final ecardForEventProvider = StreamProvider.family<Ecard?, (String eventId, String organizerId)>((ref, args) {
+  return ref.watch(firestoreServiceProvider).watchEcardForEvent(args.$1, args.$2);
 });
 
 final ecardTemplatesProvider =

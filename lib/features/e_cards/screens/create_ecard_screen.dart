@@ -92,15 +92,6 @@ class _CreateEcardScreenState extends ConsumerState<CreateEcardScreen> {
             extension: 'jpg',
           );
       setState(() => _imageUrls[key] = url);
-    } catch (e) {
-      // Previously failed silently — the spinner would just reset
-      // with no explanation if the upload was rejected (e.g. by
-      // Storage rules) or failed for any other reason.
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Image upload failed: $e'), backgroundColor: AppColors.danger),
-        );
-      }
     } finally {
       if (mounted) setState(() => _uploadingImage[key] = false);
     }
@@ -292,6 +283,7 @@ class _EventPickerStep extends ConsumerWidget {
             for (final event in events) ...[
               _ExistingEcardGuard(
                 eventId: event.id,
+                organizerId: profile.uid,
                 child: Card(
                   child: ListTile(
                     title: Text(event.title),
@@ -316,12 +308,13 @@ class _EventPickerStep extends ConsumerWidget {
 /// firestore_service.dart's watchEcardForEvent doc comment).
 class _ExistingEcardGuard extends ConsumerWidget {
   final String eventId;
+  final String organizerId;
   final Widget child;
-  const _ExistingEcardGuard({required this.eventId, required this.child});
+  const _ExistingEcardGuard({required this.eventId, required this.organizerId, required this.child});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final existing = ref.watch(ecardForEventProvider(eventId)).value;
+    final existing = ref.watch(ecardForEventProvider((eventId, organizerId))).value;
     if (existing == null) return child;
     return Card(
       color: AppColors.background,

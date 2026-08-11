@@ -283,10 +283,20 @@ class FirestoreService {
   /// E-Card for this event?" prompt), but this isn't enforced at the
   /// data layer — kept as a query rather than a doc-id-by-eventId
   /// scheme so nothing here has to change if that changes later.
-  Stream<Ecard?> watchEcardForEvent(String eventId) {
+  ///
+  /// Filters by organizer_id as well as event_id — not for the data
+  /// (event_id alone is already unique enough), but because Firestore
+  /// rules can only allow a *collection query* if the query itself
+  /// provably satisfies the rule for every possible match. The rule
+  /// checks resource.data.organizer_id == request.auth.uid, so without
+  /// this filter present in the query, Firestore rejects the whole
+  /// query with permission-denied even though every real result would
+  /// individually pass the check.
+  Stream<Ecard?> watchEcardForEvent(String eventId, String organizerId) {
     return _db
         .collection(AppStrings.ecardsCollection)
         .where('event_id', isEqualTo: eventId)
+        .where('organizer_id', isEqualTo: organizerId)
         .limit(1)
         .snapshots()
         .map((snap) => snap.docs.isEmpty ? null : Ecard.fromMap(snap.docs.first.id, snap.docs.first.data()));
