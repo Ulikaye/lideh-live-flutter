@@ -15,6 +15,14 @@ rules_version = '2';
 //   may create the review, exactly once, and only after the booking is
 //   marked completed.
 //
+// E-Cards (Phase 2, additive): ecards/{ecardId} and its guests/
+// subcollection follow the same isOwner-style direct-field-comparison
+// pattern as events/{eventId} — an organizer can only read/write
+// E-Card data whose organizer_id matches their own uid, and creating
+// an E-Card requires the referenced events/{eventId} to already be
+// owned by that same uid. ecard_templates/ is public-read reference
+// data, same treatment as skills/.
+//
 // Admin operations (managing skills/categories, blog content,
 // moderating content, verifying users) can now be performed by any
 // account with users/{uid}.user_type == 'admin', enforced via the
@@ -118,6 +126,33 @@ service cloud.firestore {
       allow update: if isSignedIn() && resource.data.organizer_id == request.auth.uid;
 
       allow delete: if isSignedIn() && resource.data.organizer_id == request.auth.uid;
+    }
+
+    // ---------------- E-Cards (Phase 2 — additive) ----------------
+    // Same ownership pattern as events/{eventId} above: direct field
+    // comparison against request.auth.uid, no new role/claims
+    // mechanism. ecards/{ecardId}.organizer_id is required to match
+    // the referenced events/{eventId}.organizer_id at create time, so
+    // an organizer can never attach an E-Card to someone else's event.
+    match /ecard_templates/{templateId} {
+      allow read: if true; // public reference data, like skills/
+      allow write: if false; // managed via Admin SDK / console only
+    }
+
+    match /ecards/{ecardId} {
+      allow read: if isSignedIn() && resource.data.organizer_id == request.auth.uid;
+
+      allow create: if isSignedIn()
+        && request.resource.data.organizer_id == request.auth.uid
+        && get(/databases/$(database)/documents/events/$(request.resource.data.event_id)).data.organizer_id == request.auth.uid;
+
+      allow update: if isSignedIn() && resource.data.organizer_id == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.organizer_id == request.auth.uid;
+
+      match /guests/{guestId} {
+        allow read, write: if isSignedIn()
+          && get(/databases/$(database)/documents/ecards/$(ecardId)).data.organizer_id == request.auth.uid;
+      }
     }
 
     // ---------------- Blog ----------------

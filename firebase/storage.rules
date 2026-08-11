@@ -62,5 +62,10 @@ service firebase.storage {
       allow read: if true;
       allow write: if isAdmin() && isImage() && underSizeLimit(5);
     }
+
+    match /ecard_media/{fileName} {
+      allow read: if true;
+      allow write: if isSignedIn() && isImage() && underSizeLimit(5);
+    }
   }
 }

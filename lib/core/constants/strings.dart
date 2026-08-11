@@ -18,11 +18,22 @@ class AppStrings {
   static const blogPostsCollection = 'blogPosts';
   static const notificationsCollection = 'notifications';
 
+  // --- E-Cards (added Phase 2 — additive only) ---
+  // ecards/{ecardId} references events/{eventId} by id; guests live in
+  // a subcollection at ecards/{ecardId}/guests/{guestId}. See
+  // ecard_provider.dart / firestore_service.dart E-Cards section.
+  static const ecardsCollection = 'ecards';
+  static const ecardTemplatesCollection = 'ecard_templates';
+  static const ecardGuestsSubcollection = 'guests';
+
   // Storage paths
   static const profilePicturesPath = 'profile_pictures';
   static const musicianMediaPath = 'musician_media';
   static const eventImagesPath = 'event_images';
   static const blogImagesPath = 'blog_images';
+
+  // --- E-Cards (added Phase 2) ---
+  static const ecardMediaPath = 'ecard_media';
 }
 
 enum UserType { musician, organizer, admin }
@@ -63,5 +74,54 @@ extension UserTypeX on UserType {
       (e) => e.name == value,
       orElse: () => UserType.organizer,
     );
+  }
+}
+
+/// The occasion an E-Card is built for. Drives which template/fields
+/// are shown (see EcardTemplate) and the display-id prefix minted for
+/// each guest (see FirestoreService.addEcardGuest). New occasions can
+/// be added here without touching the E-Card data layer or UI shell —
+/// only a new template document plus a form for its field set.
+enum EcardOccasion { wedding, worship, conference, other }
+
+extension EcardOccasionX on EcardOccasion {
+  String get value => name;
+
+  static EcardOccasion fromString(String? value) {
+    return EcardOccasion.values.firstWhere(
+      (e) => e.name == value,
+      orElse: () => EcardOccasion.other,
+    );
+  }
+
+  String get label {
+    switch (this) {
+      case EcardOccasion.wedding:
+        return 'Wedding';
+      case EcardOccasion.worship:
+        return 'Worship / Ibada';
+      case EcardOccasion.conference:
+        return 'Conference / Seminar';
+      case EcardOccasion.other:
+        return 'Other Event';
+    }
+  }
+
+  /// Prefix used for human-readable guest display IDs, e.g. "WD-0001".
+  /// Scoped per E-Card via FirestoreService.addEcardGuest — never a
+  /// global counter (see Phase 1 doc, §3, for why Harusi Cards'
+  /// single global counter doesn't work once there's more than one
+  /// organizer).
+  String get guestIdPrefix {
+    switch (this) {
+      case EcardOccasion.wedding:
+        return 'WD';
+      case EcardOccasion.worship:
+        return 'WS';
+      case EcardOccasion.conference:
+        return 'CF';
+      case EcardOccasion.other:
+        return 'EV';
+    }
   }
 }

@@ -46,12 +46,86 @@ class _OrganizerDashboardState extends ConsumerState<OrganizerDashboard> with Si
           const SizedBox(width: 8),
         ],
       ),
-      body: TabBarView(
-        controller: _tabController,
+      body: Column(
         children: [
-          _BookingsTab(organizerId: profile.uid),
-          _EventsTab(organizerId: profile.uid),
+          _ServicesRow(onEventsTap: () => _tabController.animateTo(1)),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _BookingsTab(organizerId: profile.uid),
+                _EventsTab(organizerId: profile.uid),
+              ],
+            ),
+          ),
         ],
+      ),
+    );
+  }
+}
+
+/// Services row (Musician Booking / Events / E-Cards), added above the
+/// existing My Bookings / My Events tabs — additive only, the
+/// TabController and its two tabs are untouched. "Events" jumps to the
+/// My Events tab already on this screen; "Musician Booking" goes to
+/// discovery; "E-Cards" is the new service.
+class _ServicesRow extends StatelessWidget {
+  final VoidCallback onEventsTap;
+  const _ServicesRow({required this.onEventsTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: _ServiceTile(
+              icon: Icons.library_music_outlined,
+              label: 'Musician Booking',
+              onTap: () => context.go('/musicians'),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _ServiceTile(icon: Icons.event_outlined, label: 'Events', onTap: onEventsTap),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _ServiceTile(
+              icon: Icons.mail_outline_rounded,
+              label: 'E-Cards',
+              onTap: () => context.go('/e-cards'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ServiceTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  const _ServiceTile({required this.icon, required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          child: Column(
+            children: [
+              Icon(icon, color: AppColors.primary),
+              const SizedBox(height: 6),
+              Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ),
       ),
     );
   }

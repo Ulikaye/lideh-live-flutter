@@ -23,6 +23,12 @@ import '../../features/admin/admin_blog_list_screen.dart';
 import '../../features/admin/admin_blog_editor_screen.dart';
 import '../../features/dashboard/musician_dashboard.dart';
 import '../../features/dashboard/organizer_dashboard.dart';
+import '../../features/e_cards/screens/ecard_list_screen.dart';
+import '../../features/e_cards/screens/create_ecard_screen.dart';
+import '../../features/e_cards/screens/ecard_detail_screen.dart';
+import '../../features/e_cards/screens/guest_list_screen.dart';
+import '../../features/e_cards/screens/guest_card_screen.dart';
+import '../../features/e_cards/screens/scan_ecard_screen.dart';
 import '../../features/profile/profile_screen.dart';
 import '../../features/profile/edit_profile_screen.dart';
 import '../../features/dashboard/edit_musician_details_screen.dart';
@@ -143,6 +149,35 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
               path: '/dashboard',
               builder: (_, __) => const DashboardRouterScreen()),
+          GoRoute(path: '/e-cards', builder: (_, __) => const EcardListScreen()),
+          GoRoute(
+            path: '/e-cards/create',
+            pageBuilder: (_, s) => slideTransitionPage(
+                state: s,
+                child: CreateEcardScreen(eventId: s.uri.queryParameters['eventId'])),
+          ),
+          GoRoute(
+            path: '/e-cards/:id',
+            pageBuilder: (_, s) => slideTransitionPage(
+                state: s, child: EcardDetailScreen(ecardId: s.pathParameters['id']!)),
+          ),
+          GoRoute(
+            path: '/e-cards/:id/guests',
+            pageBuilder: (_, s) => slideTransitionPage(
+                state: s, child: GuestListScreen(ecardId: s.pathParameters['id']!)),
+          ),
+          GoRoute(
+            path: '/e-cards/:id/guests/:guestId',
+            pageBuilder: (_, s) => slideTransitionPage(
+                state: s,
+                child: GuestCardScreen(
+                    ecardId: s.pathParameters['id']!, guestId: s.pathParameters['guestId']!)),
+          ),
+          GoRoute(
+            path: '/e-cards/:id/scan',
+            pageBuilder: (_, s) => slideTransitionPage(
+                state: s, child: ScanEcardScreen(ecardId: s.pathParameters['id']!)),
+          ),
           GoRoute(
               path: '/bookings', builder: (_, __) => const MyBookingsScreen()),
           GoRoute(
@@ -211,6 +246,7 @@ int _indexForPath(String path) {
   if (path.startsWith('/events')) return 2;
   if (path.startsWith('/blog')) return 3;
   if (path.startsWith('/dashboard')) return 4;
+  if (path.startsWith('/e-cards')) return 4;
   return 0;
 }
 

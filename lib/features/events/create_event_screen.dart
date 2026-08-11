@@ -55,9 +55,33 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
     );
     try {
       final id = await ref.read(firestoreServiceProvider).createEvent(event);
-      if (mounted) context.go('/events/$id');
+      if (mounted) await _promptForEcard(id);
     } finally {
       if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  /// Added for the E-Card service: offers to create a digital
+  /// invitation for the event that was just published. Purely
+  /// additive to the existing submit flow — declining behaves exactly
+  /// as before (context.go('/events/$id')).
+  Future<void> _promptForEcard(String eventId) async {
+    final create = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Create an E-Card for this event?'),
+        content: const Text('You can add a digital invitation with guest management and QR check-in.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('No, continue')),
+          ElevatedButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Yes, create E-Card')),
+        ],
+      ),
+    );
+    if (!mounted) return;
+    if (create == true) {
+      context.go('/e-cards/create?eventId=$eventId');
+    } else {
+      context.go('/events/$eventId');
     }
   }
 
