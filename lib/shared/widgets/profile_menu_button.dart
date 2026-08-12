@@ -25,6 +25,12 @@ class ProfileMenuButton extends ConsumerWidget {
           context.go('/profile');
         } else if (value == 'admin_blog') {
           context.go('/admin/blog');
+        } else if (value == 'admin_ecards') {
+          context.go('/admin/e-cards');
+        } else if (value == 'admin_users') {
+          context.go('/admin/users');
+        } else if (value == 'admin_events') {
+          context.go('/admin/events');
         } else if (value == 'signout') {
           await ref.read(authServiceProvider).signOut();
           if (context.mounted) context.go('/login');
@@ -41,7 +47,7 @@ class ProfileMenuButton extends ConsumerWidget {
             ],
           ),
         ),
-        if (profile?.userType == UserType.admin)
+        if (profile?.userType == UserType.admin) ...[
           const PopupMenuItem(
             value: 'admin_blog',
             child: Row(
@@ -52,6 +58,37 @@ class ProfileMenuButton extends ConsumerWidget {
               ],
             ),
           ),
+          const PopupMenuItem(
+            value: 'admin_ecards',
+            child: Row(
+              children: [
+                Icon(Icons.mail_outline_rounded, size: 18, color: AppColors.textSecondary),
+                SizedBox(width: 10),
+                Text('Manage E-Cards'),
+              ],
+            ),
+          ),
+          const PopupMenuItem(
+            value: 'admin_users',
+            child: Row(
+              children: [
+                Icon(Icons.people_outline, size: 18, color: AppColors.textSecondary),
+                SizedBox(width: 10),
+                Text('Manage Users'),
+              ],
+            ),
+          ),
+          const PopupMenuItem(
+            value: 'admin_events',
+            child: Row(
+              children: [
+                Icon(Icons.event_outlined, size: 18, color: AppColors.textSecondary),
+                SizedBox(width: 10),
+                Text('Manage Events'),
+              ],
+            ),
+          ),
+        ],
         const PopupMenuItem(
           value: 'signout',
           child: Row(

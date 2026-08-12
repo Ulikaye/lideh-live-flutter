@@ -25,6 +25,14 @@ class Ecard {
   /// there was exactly one wedding.
   final int guestCounter;
 
+  /// 'private' (default) or 'public'. Private E-Cards are only
+  /// reachable by direct link/QR — nothing lists them. Public ones
+  /// also appear on the platform's public E-Cards page
+  /// (/e-cards/public) for discovery. Opt-in only, per design: an
+  /// organizer sharing a wedding invite via WhatsApp/email has no
+  /// reason to also want it listed publicly unless they choose to.
+  final String visibility;
+
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -36,9 +44,12 @@ class Ecard {
     required this.templateId,
     required this.fields,
     this.guestCounter = 0,
+    this.visibility = 'private',
     this.createdAt,
     this.updatedAt,
   });
+
+  bool get isPublic => visibility == 'public';
 
   factory Ecard.fromMap(String id, Map<String, dynamic> map) {
     return Ecard(
@@ -49,6 +60,7 @@ class Ecard {
       templateId: map['template_id'] ?? '',
       fields: Map<String, dynamic>.from(map['fields'] ?? const {}),
       guestCounter: map['guest_counter'] ?? 0,
+      visibility: map['visibility'] ?? 'private',
       createdAt: (map['created_at'] as Timestamp?)?.toDate(),
       updatedAt: (map['updated_at'] as Timestamp?)?.toDate(),
     );
@@ -62,13 +74,14 @@ class Ecard {
       'template_id': templateId,
       'fields': fields,
       'guest_counter': guestCounter,
+      'visibility': visibility,
       'created_at':
           createdAt != null ? Timestamp.fromDate(createdAt!) : FieldValue.serverTimestamp(),
       'updated_at': FieldValue.serverTimestamp(),
     };
   }
 
-  Ecard copyWith({Map<String, dynamic>? fields, String? templateId}) {
+  Ecard copyWith({Map<String, dynamic>? fields, String? templateId, String? visibility}) {
     return Ecard(
       id: id,
       eventId: eventId,
@@ -77,6 +90,7 @@ class Ecard {
       templateId: templateId ?? this.templateId,
       fields: fields ?? this.fields,
       guestCounter: guestCounter,
+      visibility: visibility ?? this.visibility,
       createdAt: createdAt,
       updatedAt: updatedAt,
     );

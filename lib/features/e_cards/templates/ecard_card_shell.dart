@@ -18,12 +18,18 @@ class EcardCardShell extends StatelessWidget {
   /// placeholder box instead of generating a code for nothing.
   final String? qrData;
 
-  const EcardCardShell({super.key, required this.occasion, required this.child, this.qrData});
+  /// Lets a specific template override the occasion's default accent
+  /// (e.g. the wedding redesign's sage green) without every occasion
+  /// needing its own shell variant. Null uses [_accent] as before.
+  final Color? accentOverride;
+
+  const EcardCardShell({super.key, required this.occasion, required this.child, this.qrData, this.accentOverride});
 
   Color get _accent {
+    if (accentOverride != null) return accentOverride!;
     switch (occasion) {
       case EcardOccasion.wedding:
-        return const Color(0xFFB76E79); // dusty rose
+        return const Color(0xFF6B8F5A); // sage green — matches the botanical wedding redesign
       case EcardOccasion.worship:
         return AppColors.primary;
       case EcardOccasion.conference:

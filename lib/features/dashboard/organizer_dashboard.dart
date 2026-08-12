@@ -188,10 +188,30 @@ class _EventsTab extends ConsumerWidget {
                   child: ListTile(
                     title: Text(event.title),
                     subtitle: Text(event.location),
-                    trailing: event.isCancelled
-                        ? const Chip(label: Text('Cancelled'), backgroundColor: Color(0x1AE74C3C))
-                        : const Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary),
                     onTap: () => context.go('/events/${event.id}'),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (event.isCancelled)
+                          const Padding(
+                            padding: EdgeInsets.only(right: 4),
+                            child: Chip(label: Text('Unpublished'), backgroundColor: Color(0x1AE74C3C)),
+                          ),
+                        PopupMenuButton<String>(
+                          onSelected: (value) => _handleEventAction(context, ref, event, value),
+                          itemBuilder: (context) => [
+                            PopupMenuItem(
+                              value: 'toggle',
+                              child: Text(event.isCancelled ? 'Republish' : 'Unpublish'),
+                            ),
+                            const PopupMenuItem(
+                              value: 'delete',
+                              child: Text('Delete', style: TextStyle(color: AppColors.danger)),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 );
               },
@@ -200,5 +220,50 @@ class _EventsTab extends ConsumerWidget {
         );
       },
     );
+  }
+
+  Future<void> _handleEventAction(BuildContext context, WidgetRef ref, dynamic event, String action) async {
+    final service = ref.read(firestoreServiceProvider);
+
+    if (action == 'toggle') {
+      final unpublishing = !event.isCancelled;
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(unpublishing ? 'Unpublish this event?' : 'Republish this event?'),
+          content: Text(unpublishing
+              ? 'It will be hidden from the public Events listing immediately. You can republish it any time.'
+              : 'It will reappear in the public Events listing immediately.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
+            TextButton(onPressed: () => Navigator.of(context).pop(true), child: Text(unpublishing ? 'Unpublish' : 'Republish')),
+          ],
+        ),
+      );
+      if (confirmed == true) {
+        await service.setEventCancelled(event.id, unpublishing);
+      }
+      return;
+    }
+
+    if (action == 'delete') {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Delete this event?'),
+          content: const Text('This permanently removes the event. This cannot be undone.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Delete', style: TextStyle(color: AppColors.danger)),
+            ),
+          ],
+        ),
+      );
+      if (confirmed == true) {
+        await service.deleteEvent(event.id);
+      }
+    }
   }
 }

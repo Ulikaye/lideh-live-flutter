@@ -13,3 +13,7 @@ final eventByIdProvider = StreamProvider.family<Event?, String>((ref, id) {
 final eventsForOrganizerProvider = StreamProvider.family<List<Event>, String>((ref, organizerId) {
   return ref.watch(firestoreServiceProvider).watchEventsForOrganizer(organizerId);
 });
+
+final allEventsForAdminProvider = StreamProvider<List<Event>>((ref) {
+  return ref.watch(firestoreServiceProvider).watchAllEventsForAdmin();
+});

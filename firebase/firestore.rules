@@ -33,6 +33,22 @@ rules_version = '2';
 // 'admin' in the first place (see the users/{uid} update rule), so an
 // account can only become an admin via the Firebase Console or Admin
 // SDK, never through the app itself.
+//
+// Admin account moderation (deactivate/reactivate a musician or
+// organizer): deliberately narrow. isAdmin() is allowed to update
+// ONLY the `disabled` field on users/{uid} and musicians/{uid} —
+// enforced via affectedKeys().hasOnly(['disabled']) — never full
+// write access to someone else's profile. The account owner still
+// controls every other field of their own document as before; they
+// just can't touch `disabled` themselves (same locking pattern
+// already used for user_type). Admin delete of users/{uid} and
+// musicians/{uid} removes the Firestore profile only — it does NOT
+// remove the underlying Firebase Auth credential, which only the
+// Admin SDK (a Cloud Function) can do for an account that isn't your
+// own. A deleted profile is functionally locked out of the app (no
+// dashboard, not in any directory) even though the bare login
+// credential technically still exists until that Cloud Function is
+// deployed.
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -58,25 +74,34 @@ service cloud.firestore {
     match /users/{uid} {
       allow read: if isSignedIn();
       allow create: if isOwner(uid);
-      allow update: if isOwner(uid)
-        // user_type is set once at registration and never changed by
-        // the client afterwards, to keep role-specific data consistent.
-        && request.resource.data.user_type == resource.data.user_type;
-      allow delete: if isOwner(uid);
+      allow update: if (isOwner(uid)
+          // user_type is set once at registration and never changed by
+          // the client afterwards, to keep role-specific data consistent.
+          && request.resource.data.user_type == resource.data.user_type
+          // The owner can change anything about their own profile
+          // except `disabled` — only an admin may flip that (below).
+          && request.resource.data.disabled == resource.data.disabled)
+        || (isAdmin()
+          // Admin's only allowed write here is the disabled flag —
+          // nothing else about another user's profile, ever.
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['disabled']));
+      allow delete: if isOwner(uid) || isAdmin();
     }
 
     // ---------------- Musicians ----------------
     match /musicians/{uid} {
-      allow read: if true; // public directory
-      allow create, update: if isOwner(uid);
-      allow delete: if isOwner(uid);
+      allow read: if true; // public directory — the browse query itself filters out disabled == true
+      allow create: if isOwner(uid);
+      allow update: if (isOwner(uid) && request.resource.data.disabled == resource.data.disabled)
+        || (isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['disabled']));
+      allow delete: if isOwner(uid) || isAdmin();
     }
 
     // ---------------- Organizers ----------------
     match /organizers/{uid} {
       allow read: if isSignedIn();
       allow create, update: if isOwner(uid);
-      allow delete: if isOwner(uid);
+      allow delete: if isOwner(uid) || isAdmin();
     }
 
     // ---------------- Skills (admin-managed reference data) ----------------
@@ -123,31 +148,40 @@ service cloud.firestore {
 
       allow create: if isSignedIn() && request.resource.data.organizer_id == request.auth.uid;
 
-      allow update: if isSignedIn() && resource.data.organizer_id == request.auth.uid;
+      allow update: if isSignedIn() && (resource.data.organizer_id == request.auth.uid || isAdmin());
 
-      allow delete: if isSignedIn() && resource.data.organizer_id == request.auth.uid;
+      allow delete: if isSignedIn() && (resource.data.organizer_id == request.auth.uid || isAdmin());
     }
 
-    // ---------------- E-Cards (Phase 2 — additive) ----------------
+    // ---------------- E-Cards (Phase 2 — additive; visibility + admin moderation added later) ----------------
     // Same ownership pattern as events/{eventId} above: direct field
     // comparison against request.auth.uid, no new role/claims
     // mechanism. ecards/{ecardId}.organizer_id is required to match
     // the referenced events/{eventId}.organizer_id at create time, so
     // an organizer can never attach an E-Card to someone else's event.
+    //
+    // visibility: 'private' (default) or 'public' — an organizer's own
+    // opt-in choice (see Ecard model doc comment). A public E-Card is
+    // readable by anyone, signed in or not, same treatment as
+    // events/{eventId}'s public listing. Guests/ subcollection stays
+    // owner-only regardless of visibility — a card being public never
+    // exposes its guest list.
     match /ecard_templates/{templateId} {
       allow read: if true; // public reference data, like skills/
       allow write: if false; // managed via Admin SDK / console only
     }
 
     match /ecards/{ecardId} {
-      allow read: if isSignedIn() && resource.data.organizer_id == request.auth.uid;
+      allow read: if (isSignedIn() && resource.data.organizer_id == request.auth.uid)
+        || isAdmin()
+        || resource.data.visibility == 'public';
 
       allow create: if isSignedIn()
         && request.resource.data.organizer_id == request.auth.uid
         && get(/databases/$(database)/documents/events/$(request.resource.data.event_id)).data.organizer_id == request.auth.uid;
 
-      allow update: if isSignedIn() && resource.data.organizer_id == request.auth.uid;
-      allow delete: if isSignedIn() && resource.data.organizer_id == request.auth.uid;
+      allow update: if (isSignedIn() && resource.data.organizer_id == request.auth.uid) || isAdmin();
+      allow delete: if (isSignedIn() && resource.data.organizer_id == request.auth.uid) || isAdmin();
 
       match /guests/{guestId} {
         allow read, write: if isSignedIn()

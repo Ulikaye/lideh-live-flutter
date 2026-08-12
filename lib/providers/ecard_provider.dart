@@ -3,6 +3,7 @@ import '../core/constants/strings.dart';
 import '../models/ecard.dart';
 import '../models/ecard_guest.dart';
 import '../models/ecard_template.dart';
+import '../models/user_profile.dart';
 import 'auth_provider.dart';
 
 // Mirrors event_provider.dart's pattern exactly: thin StreamProvider
@@ -41,4 +42,19 @@ final guestsForEcardProvider =
 final ecardGuestProvider =
     StreamProvider.family<EcardGuest?, (String ecardId, String guestId)>((ref, ids) {
   return ref.watch(firestoreServiceProvider).watchEcardGuest(ids.$1, ids.$2);
+});
+
+/// Public E-Cards page (/e-cards/public) — no organizer scoping.
+final publicEcardsProvider = StreamProvider<List<Ecard>>((ref) {
+  return ref.watch(firestoreServiceProvider).watchPublicEcards();
+});
+
+/// Admin moderation view — every E-Card regardless of owner.
+final allEcardsForAdminProvider = StreamProvider<List<Ecard>>((ref) {
+  return ref.watch(firestoreServiceProvider).watchAllEcardsForAdmin();
+});
+
+/// Admin user directory — every registered account.
+final allUsersForAdminProvider = StreamProvider<List<UserProfile>>((ref) {
+  return ref.watch(firestoreServiceProvider).watchAllUsersForAdmin();
 });

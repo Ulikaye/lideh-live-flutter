@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/strings.dart';
+import '../../../providers/auth_provider.dart';
 import '../../../providers/ecard_provider.dart';
 import '../../../shared/widgets/error_widget.dart';
 import '../../../shared/widgets/loading_indicator.dart';
@@ -65,6 +66,25 @@ class EcardDetailScreen extends ConsumerWidget {
                           ),
                         ),
                     ],
+                  ),
+                  const SizedBox(height: 16),
+                  Card(
+                    child: SwitchListTile(
+                      value: ecard.isPublic,
+                      onChanged: (value) => ref
+                          .read(firestoreServiceProvider)
+                          .updateEcardVisibility(ecardId, value ? 'public' : 'private'),
+                      secondary: Icon(
+                        ecard.isPublic ? Icons.public : Icons.lock_outline,
+                        color: ecard.isPublic ? AppColors.primary : AppColors.textSecondary,
+                      ),
+                      title: const Text('Visible on public E-Cards page'),
+                      subtitle: Text(
+                        ecard.isPublic
+                            ? 'Anyone can find this on the public listing'
+                            : 'Private — only reachable by direct link or QR (WhatsApp, email, etc.)',
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 16),
                   guestsAsync.when(

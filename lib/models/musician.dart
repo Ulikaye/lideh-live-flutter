@@ -14,6 +14,16 @@ class Musician {
   final String? location;
   final double avgRating;
   final int reviewCount;
+
+  /// Mirrors users/{uid}.disabled — denormalized here because the
+  /// public musician directory queries this collection directly, not
+  /// users/. Kept in sync by the same admin action that sets it on
+  /// the user doc (see FirestoreService.setUserDisabled). The public
+  /// browse query filters on this field directly; a disabled
+  /// musician's own profile document still exists, it's just excluded
+  /// from discovery.
+  final bool disabled;
+
   final DateTime? joinedAt;
 
   const Musician({
@@ -28,6 +38,7 @@ class Musician {
     this.location,
     this.avgRating = 0,
     this.reviewCount = 0,
+    this.disabled = false,
     this.joinedAt,
   });
 
@@ -44,6 +55,7 @@ class Musician {
       location: map['location'],
       avgRating: (map['avg_rating'] as num?)?.toDouble() ?? 0,
       reviewCount: map['review_count'] ?? 0,
+      disabled: map['disabled'] ?? false,
       joinedAt: (map['joined_at'] as Timestamp?)?.toDate(),
     );
   }
@@ -60,6 +72,7 @@ class Musician {
       'location': location,
       'avg_rating': avgRating,
       'review_count': reviewCount,
+      'disabled': disabled,
       'joined_at': joinedAt != null ? Timestamp.fromDate(joinedAt!) : FieldValue.serverTimestamp(),
     };
   }

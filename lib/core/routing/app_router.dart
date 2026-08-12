@@ -21,11 +21,17 @@ import '../../features/blog/content_hub_screen.dart';
 import '../../features/blog/blog_detail_screen.dart';
 import '../../features/admin/admin_blog_list_screen.dart';
 import '../../features/admin/admin_blog_editor_screen.dart';
+import '../../features/admin/admin_ecard_list_screen.dart';
+import '../../features/admin/admin_user_list_screen.dart';
+import '../../features/admin/admin_event_list_screen.dart';
+import '../../features/authentication/account_deactivated_screen.dart';
 import '../../features/dashboard/musician_dashboard.dart';
 import '../../features/dashboard/organizer_dashboard.dart';
 import '../../features/e_cards/screens/ecard_list_screen.dart';
 import '../../features/e_cards/screens/create_ecard_screen.dart';
 import '../../features/e_cards/screens/ecard_detail_screen.dart';
+import '../../features/e_cards/screens/public_ecards_screen.dart';
+import '../../features/e_cards/screens/public_ecard_screen.dart';
 import '../../features/e_cards/screens/guest_list_screen.dart';
 import '../../features/e_cards/screens/guest_card_screen.dart';
 import '../../features/e_cards/screens/scan_ecard_screen.dart';
@@ -43,6 +49,7 @@ final _publicRoutes = <String>{
   '/musicians',
   '/events',
   '/blog',
+  '/e-cards/public',
   '/login',
   '/register',
   '/about',
@@ -61,6 +68,7 @@ bool _isPublic(String path) {
     return true; // musician profile pages are public
   if (path.startsWith('/events/')) return true;
   if (path.startsWith('/blog/')) return true;
+  if (path.startsWith('/e-cards/public/')) return true;
   return false;
 }
 
@@ -69,6 +77,12 @@ final routerProvider = Provider<GoRouter>((ref) {
   ref.listen(authStateProvider, (prev, next) {
     authNotifier.value =
         !authNotifier.value; // force GoRouter to re-evaluate redirects
+  });
+  // Also re-evaluate when the profile itself changes — this is what
+  // makes an admin's deactivate action take effect immediately for a
+  // user who's actively using the app, not just on their next login.
+  ref.listen(currentUserProfileProvider, (prev, next) {
+    authNotifier.value = !authNotifier.value;
   });
 
   return GoRouter(
@@ -86,6 +100,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
       if (isLoggedIn && goingToAuthPages) {
         return '/';
+      }
+      if (isLoggedIn && path != '/account-deactivated') {
+        final profile = ref.read(currentUserProfileProvider).value;
+        if (profile?.disabled == true) {
+          return '/account-deactivated';
+        }
       }
       if (path.startsWith('/admin')) {
         final profile = ref.read(currentUserProfileProvider).value;
@@ -146,9 +166,21 @@ final routerProvider = Provider<GoRouter>((ref) {
                 state: s,
                 child: AdminBlogEditorScreen(postId: s.pathParameters['id'])),
           ),
+          GoRoute(path: '/admin/e-cards', builder: (_, __) => const AdminEcardListScreen()),
+          GoRoute(path: '/admin/users', builder: (_, __) => const AdminUserListScreen()),
+          GoRoute(path: '/admin/events', builder: (_, __) => const AdminEventListScreen()),
+          GoRoute(
+              path: '/account-deactivated',
+              builder: (_, __) => const AccountDeactivatedScreen()),
           GoRoute(
               path: '/dashboard',
               builder: (_, __) => const DashboardRouterScreen()),
+          GoRoute(path: '/e-cards/public', builder: (_, __) => const PublicEcardsScreen()),
+          GoRoute(
+            path: '/e-cards/public/:id',
+            pageBuilder: (_, s) => slideTransitionPage(
+                state: s, child: PublicEcardScreen(ecardId: s.pathParameters['id']!)),
+          ),
           GoRoute(path: '/e-cards', builder: (_, __) => const EcardListScreen()),
           GoRoute(
             path: '/e-cards/create',

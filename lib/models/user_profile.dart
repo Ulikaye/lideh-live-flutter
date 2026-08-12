@@ -14,6 +14,14 @@ class UserProfile {
   final String? bio;
   final String? profilePictureUrl;
   final bool verified;
+
+  /// Admin-only account control (see firestore.rules — only an admin
+  /// can flip this, never the user themselves). A disabled account is
+  /// blocked from the app at the router level (see app_router.dart)
+  /// and, for musicians, hidden from the public directory (see
+  /// Musician.disabled). Does not delete anything — fully reversible.
+  final bool disabled;
+
   final DateTime? createdAt;
 
   const UserProfile({
@@ -26,6 +34,7 @@ class UserProfile {
     this.bio,
     this.profilePictureUrl,
     this.verified = false,
+    this.disabled = false,
     this.createdAt,
   });
 
@@ -40,6 +49,7 @@ class UserProfile {
       bio: map['bio'],
       profilePictureUrl: map['profile_picture_url'],
       verified: map['verified'] ?? false,
+      disabled: map['disabled'] ?? false,
       createdAt: (map['created_at'] as Timestamp?)?.toDate(),
     );
   }
@@ -54,6 +64,7 @@ class UserProfile {
       'bio': bio,
       'profile_picture_url': profilePictureUrl,
       'verified': verified,
+      'disabled': disabled,
       'created_at': createdAt != null ? Timestamp.fromDate(createdAt!) : FieldValue.serverTimestamp(),
     };
   }
@@ -65,6 +76,7 @@ class UserProfile {
     String? bio,
     String? profilePictureUrl,
     bool? verified,
+    bool? disabled,
   }) {
     return UserProfile(
       uid: uid,
@@ -76,6 +88,7 @@ class UserProfile {
       bio: bio ?? this.bio,
       profilePictureUrl: profilePictureUrl ?? this.profilePictureUrl,
       verified: verified ?? this.verified,
+      disabled: disabled ?? this.disabled,
       createdAt: createdAt,
     );
   }
