@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants/strings.dart';
 import '../models/ecard.dart';
 import '../models/ecard_guest.dart';
+import '../models/ecard_request.dart';
 import '../models/ecard_template.dart';
 import '../models/user_profile.dart';
 import 'auth_provider.dart';
@@ -57,4 +58,30 @@ final allEcardsForAdminProvider = StreamProvider<List<Ecard>>((ref) {
 /// Admin user directory — every registered account.
 final allUsersForAdminProvider = StreamProvider<List<UserProfile>>((ref) {
   return ref.watch(firestoreServiceProvider).watchAllUsersForAdmin();
+});
+
+/// Any single user's profile by uid — unlike currentUserProfileProvider
+/// (hardcoded to the signed-in user), this looks up an arbitrary
+/// account. Used where admin needs another user's contact details,
+/// e.g. reviewing an E-Card request's organizer (see
+/// admin_ecard_requests_screen.dart).
+final userProfileByIdProvider = StreamProvider.family<UserProfile?, String>((ref, uid) {
+  return ref.watch(firestoreServiceProvider).watchUser(uid);
+});
+
+/// Keyed by (organizerId, eventId) — the current approval status for
+/// creating an E-Card for this specific event.
+final ecardRequestForEventProvider =
+    StreamProvider.family<EcardRequest?, (String organizerId, String eventId)>((ref, ids) {
+  return ref.watch(firestoreServiceProvider).watchLatestEcardRequestForEvent(ids.$1, ids.$2);
+});
+
+/// Admin's live badge count — see EcardRequest's doc comment for why
+/// this is a count query rather than the notifications/ collection.
+final pendingEcardRequestCountProvider = StreamProvider<int>((ref) {
+  return ref.watch(firestoreServiceProvider).watchPendingEcardRequestCount();
+});
+
+final allEcardRequestsForAdminProvider = StreamProvider<List<EcardRequest>>((ref) {
+  return ref.watch(firestoreServiceProvider).watchAllEcardRequestsForAdmin();
 });

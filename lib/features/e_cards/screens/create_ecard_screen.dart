@@ -6,6 +6,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/strings.dart';
 import '../../../core/utils/validators.dart';
 import '../../../models/ecard.dart';
+import '../../../models/ecard_request.dart';
 import '../../../models/ecard_template.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../providers/ecard_provider.dart';
@@ -58,11 +59,46 @@ class _CreateEcardScreenState extends ConsumerState<CreateEcardScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _saving = false;
 
-  int get _step {
-    if (_eventId == null) return 0;
-    if (_occasion == null) return 1;
-    if (_template == null && !_useFallbackFields) return 2;
-    return 3;
+  Widget _buildStep() {
+    if (_eventId == null) {
+      return _EventPickerStep(onPicked: (id) => setState(() => _eventId = id));
+    }
+    final organizerId = ref.read(authServiceProvider).currentUser!.uid;
+    final requestAsync = ref.watch(ecardRequestForEventProvider((organizerId, _eventId!)));
+    return requestAsync.when(
+      loading: () => const LoadingIndicator(),
+      error: (e, _) => AppErrorWidget(message: 'Could not check approval status'),
+      data: (EcardRequest? request) {
+        if (request == null || request.isRejected) {
+          return _ApprovalGateStep(
+            organizerId: organizerId,
+            eventId: _eventId!,
+            rejectedReply: request?.isRejected == true ? request!.adminReply : null,
+          );
+        }
+        if (request.isPending) {
+          return const _ApprovalPendingStep();
+        }
+        // approved
+        if (_occasion == null) {
+          return _OccasionPickerStep(onPicked: (o) => setState(() => _occasion = o));
+        }
+        if (_template == null && !_useFallbackFields) {
+          return _TemplatePickerStep(
+            occasion: _occasion!,
+            onPicked: (t) => setState(() {
+              _template = t;
+              _prepareControllersFor(_activeFieldSchema);
+            }),
+            onSkip: () => setState(() {
+              _useFallbackFields = true;
+              _prepareControllersFor(_activeFieldSchema);
+            }),
+          );
+        }
+        return _buildFieldForm();
+      },
+    );
   }
 
   List<String> get _activeFieldSchema =>
@@ -145,22 +181,7 @@ class _CreateEcardScreenState extends ConsumerState<CreateEcardScreen> {
           padding: const EdgeInsets.all(24),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 560),
-            child: switch (_step) {
-              0 => _EventPickerStep(onPicked: (id) => setState(() => _eventId = id)),
-              1 => _OccasionPickerStep(onPicked: (o) => setState(() => _occasion = o)),
-              2 => _TemplatePickerStep(
-                  occasion: _occasion!,
-                  onPicked: (t) => setState(() {
-                    _template = t;
-                    _prepareControllersFor(_activeFieldSchema);
-                  }),
-                  onSkip: () => setState(() {
-                    _useFallbackFields = true;
-                    _prepareControllersFor(_activeFieldSchema);
-                  }),
-                ),
-              _ => _buildFieldForm(),
-            },
+            child: _buildStep(),
           ),
         ),
       ),
@@ -326,6 +347,91 @@ class _ExistingEcardGuard extends ConsumerWidget {
           child: const Text('View'),
         ),
       ),
+    );
+  }
+}
+
+class _ApprovalGateStep extends ConsumerStatefulWidget {
+  final String organizerId;
+  final String eventId;
+
+  /// Set only when the most recent request for this event was
+  /// rejected — shown so the organizer knows why before sending
+  /// another one, rather than it feeling like a mystery re-block.
+  final String? rejectedReply;
+  const _ApprovalGateStep({required this.organizerId, required this.eventId, this.rejectedReply});
+
+  @override
+  ConsumerState<_ApprovalGateStep> createState() => _ApprovalGateStepState();
+}
+
+class _ApprovalGateStepState extends ConsumerState<_ApprovalGateStep> {
+  bool _sending = false;
+
+  Future<void> _sendRequest() async {
+    setState(() => _sending = true);
+    try {
+      await ref
+          .read(firestoreServiceProvider)
+          .createEcardRequest(organizerId: widget.organizerId, eventId: widget.eventId);
+      // No manual navigation needed — CreateEcardScreen._buildStep is
+      // watching this exact (organizerId, eventId) request live, so it
+      // swaps to _ApprovalPendingStep on its own the moment this new
+      // document appears.
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Icon(Icons.verified_user_outlined, size: 40, color: AppColors.primary),
+        const SizedBox(height: 12),
+        const Text(
+          'This needs admin approval',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          widget.rejectedReply != null
+              ? 'Your last request wasn\'t approved: "${widget.rejectedReply}". You can send a new one.'
+              : 'Send a request and an admin will review it — this page updates on its own once it\'s resolved.',
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: AppColors.textSecondary),
+        ),
+        const SizedBox(height: 20),
+        ElevatedButton(
+          onPressed: _sending ? null : _sendRequest,
+          child: _sending
+              ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+              : const Text('Send request'),
+        ),
+      ],
+    );
+  }
+}
+
+class _ApprovalPendingStep extends StatelessWidget {
+  const _ApprovalPendingStep();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Column(
+      children: [
+        Icon(Icons.hourglass_top_outlined, size: 40, color: AppColors.textSecondary),
+        SizedBox(height: 12),
+        Text('Waiting for admin approval', textAlign: TextAlign.center, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+        SizedBox(height: 8),
+        Text(
+          'You\'ll move to the next step automatically as soon as this is approved.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
+      ],
     );
   }
 }

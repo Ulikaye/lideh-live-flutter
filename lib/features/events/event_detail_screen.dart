@@ -7,6 +7,7 @@ import '../../core/constants/strings.dart';
 import '../../models/booking.dart';
 import '../../models/event.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/ecard_provider.dart';
 import '../../providers/event_provider.dart';
 import '../../shared/widgets/error_widget.dart';
 import '../../shared/widgets/loading_indicator.dart';
@@ -20,6 +21,7 @@ class EventDetailScreen extends ConsumerWidget {
     final eventAsync = ref.watch(eventByIdProvider(eventId));
     final profile = ref.watch(currentUserProfileProvider).value;
     final isMusician = profile?.userType == UserType.musician;
+    final isOwner = profile != null;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Event Details')),
@@ -27,38 +29,86 @@ class EventDetailScreen extends ConsumerWidget {
         loading: () => const LoadingIndicator(),
         error: (e, _) => AppErrorWidget(message: 'Could not load event'),
         data: (event) {
-          if (event == null) return const EmptyStateWidget(title: 'Event not found');
+          if (event == null)
+            return const EmptyStateWidget(title: 'Event not found');
+          final ownsThisEvent = isOwner && event.organizerId == profile!.uid;
 
           return Center(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 600),
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(event.title, style: Theme.of(context).textTheme.headlineSmall),
-                        const SizedBox(height: 12),
-                        _Row(icon: Icons.calendar_today_outlined, text: DateFormat('EEEE, MMM d, yyyy').format(event.date)),
-                        if (event.time != null) _Row(icon: Icons.access_time_outlined, text: event.time!),
-                        _Row(icon: Icons.location_on_outlined, text: event.location),
-                        if (event.description != null && event.description!.isNotEmpty) ...[
-                          const Divider(height: 24),
-                          Text(event.description!),
-                        ],
-                        const SizedBox(height: 20),
-                        if (isMusician)
-                          ElevatedButton.icon(
-                            onPressed: () => _applyToPerform(context, ref, event),
-                            icon: const Icon(Icons.how_to_reg_outlined),
-                            label: const Text('Apply to Perform'),
-                          ),
-                      ],
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(event.title,
+                                style:
+                                    Theme.of(context).textTheme.headlineSmall),
+                            const SizedBox(height: 12),
+                            _Row(
+                                icon: Icons.calendar_today_outlined,
+                                text: DateFormat('EEEE, MMM d, yyyy')
+                                    .format(event.date)),
+                            if (event.time != null)
+                              _Row(
+                                  icon: Icons.access_time_outlined,
+                                  text: event.time!),
+                            _Row(
+                                icon: Icons.location_on_outlined,
+                                text: event.location),
+                            if (event.description != null &&
+                                event.description!.isNotEmpty) ...[
+                              const Divider(height: 24),
+                              Text(event.description!),
+                            ],
+                            const SizedBox(height: 20),
+                            if (isMusician)
+                              ElevatedButton.icon(
+                                onPressed: () =>
+                                    _applyToPerform(context, ref, event),
+                                icon: const Icon(Icons.how_to_reg_outlined),
+                                label: const Text('Apply to Perform'),
+                              ),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
+                    if (ownsThisEvent) ...[
+                      const SizedBox(height: 16),
+                      Card(
+                        child: SwitchListTile(
+                          value: event.isPublished,
+                          onChanged: (value) => ref
+                              .read(firestoreServiceProvider)
+                              .updateEventPublished(event.id, value),
+                          secondary: Icon(
+                            event.isPublished
+                                ? Icons.public
+                                : Icons.drafts_outlined,
+                            color: event.isPublished
+                                ? AppColors.primary
+                                : AppColors.textSecondary,
+                          ),
+                          title:
+                              Text(event.isPublished ? 'Published' : 'Draft'),
+                          subtitle: Text(
+                            event.isPublished
+                                ? 'Visible to everyone browsing events'
+                                : 'Only visible to you — musicians and the public can\'t see it yet',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      _EcardLinkCard(
+                          organizerId: event.organizerId, eventId: event.id),
+                    ],
+                  ],
                 ),
               ),
             ),
@@ -68,7 +118,8 @@ class EventDetailScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _applyToPerform(BuildContext context, WidgetRef ref, Event event) async {
+  Future<void> _applyToPerform(
+      BuildContext context, WidgetRef ref, Event event) async {
     final musicianId = ref.read(authServiceProvider).currentUser!.uid;
     final booking = Booking(
       id: '',
@@ -85,6 +136,50 @@ class EventDetailScreen extends ConsumerWidget {
     );
     final id = await ref.read(firestoreServiceProvider).createBooking(booking);
     if (context.mounted) context.go('/bookings/$id');
+  }
+}
+
+class _EcardLinkCard extends ConsumerWidget {
+  final String organizerId;
+  final String eventId;
+  const _EcardLinkCard({required this.organizerId, required this.eventId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ecardAsync = ref.watch(ecardForEventProvider((eventId, organizerId)));
+
+    return ecardAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (e, _) => const SizedBox.shrink(),
+      data: (ecard) {
+        if (ecard != null) {
+          return Card(
+            child: ListTile(
+              leading: const Icon(Icons.mail_outline_rounded,
+                  color: AppColors.primary),
+              title: const Text('E-Card'),
+              subtitle: const Text('View, add guests, or scan check-ins'),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () => context.go('/e-cards/${ecard.id}'),
+            ),
+          );
+        }
+        // No E-Card yet for this event — available any time, not just
+        // right after creating the event, and regardless of whether
+        // the event itself is published or still a draft.
+        return Card(
+          child: ListTile(
+            leading: const Icon(Icons.mail_outline_rounded,
+                color: AppColors.textSecondary),
+            title: const Text('Create E-Card'),
+            subtitle: const Text(
+                'Add a digital invitation with guest management and QR check-in'),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () => context.go('/e-cards/create?eventId=$eventId'),
+          ),
+        );
+      },
+    );
   }
 }
 

@@ -13,6 +13,19 @@ class Event {
   final String? description;
   final String? imageUrl;
   final bool isCancelled;
+
+  /// Draft/published state. Defaults to `true` here (not `false`) —
+  /// this default only ever applies when the field is MISSING from a
+  /// stored document, i.e. every event created before this field
+  /// existed. Treating "missing" as "published" is what keeps every
+  /// existing live event visible with no backfill migration needed;
+  /// the actual "start as a draft" behavior for NEW events comes from
+  /// create_event_screen.dart explicitly constructing
+  /// Event(isPublished: false, ...), not from this default. See the
+  /// matching firestore.rules comment (`is_published != false`) for
+  /// the server-side half of this same reasoning.
+  final bool isPublished;
+
   final DateTime? createdAt;
 
   const Event({
@@ -25,6 +38,7 @@ class Event {
     this.description,
     this.imageUrl,
     this.isCancelled = false,
+    this.isPublished = true,
     this.createdAt,
   });
 
@@ -39,6 +53,7 @@ class Event {
       description: map['description'],
       imageUrl: map['image_url'],
       isCancelled: map['is_cancelled'] ?? false,
+      isPublished: map['is_published'] ?? true,
       createdAt: (map['created_at'] as Timestamp?)?.toDate(),
     );
   }
@@ -53,6 +68,7 @@ class Event {
       'description': description,
       'image_url': imageUrl,
       'is_cancelled': isCancelled,
+      'is_published': isPublished,
       'created_at': createdAt != null ? Timestamp.fromDate(createdAt!) : FieldValue.serverTimestamp(),
     };
   }

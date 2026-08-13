@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/strings.dart';
 import '../../../models/ecard_guest.dart';
@@ -84,12 +86,62 @@ class _GuestListScreenState extends ConsumerState<GuestListScreen> {
     }
   }
 
+  bool _exporting = false;
+
+  /// Builds a CSV of the guest list and hands it to the platform
+  /// share sheet via share_plus — same mechanism as the invitation
+  /// image share in guest_card_screen.dart, so on mobile this opens
+  /// the native share sheet (WhatsApp, email, Save to Files, etc.)
+  /// and on web it triggers a browser download. Plain string
+  /// building, no CSV package needed — the only field that could
+  /// plausibly contain a comma is full_name, which gets quoted.
+  Future<void> _exportCsv(List<EcardGuest> guests) async {
+    setState(() => _exporting = true);
+    try {
+      final buffer = StringBuffer('Display ID,Full Name,Phone,Category,Checked In,Checked In Time\n');
+      for (final g in guests) {
+        final name = '"${g.fullName.replaceAll('"', '""')}"';
+        final checkedInTime = g.checkedInTime?.toIso8601String() ?? '';
+        buffer.writeln('${g.displayId},$name,${g.phone ?? ''},${g.category ?? ''},${g.checkedIn},$checkedInTime');
+      }
+      final bytes = utf8.encode(buffer.toString());
+      await SharePlus.instance.share(ShareParams(
+        subject: 'Guest list',
+        files: [XFile.fromData(bytes, name: 'guests.csv', mimeType: 'text/csv')],
+      ));
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not export the guest list. Please try again.'), backgroundColor: AppColors.danger),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _exporting = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final ecardAsync = ref.watch(ecardByIdProvider(widget.ecardId));
+    final guestsForExport = ref.watch(guestsForEcardProvider(widget.ecardId));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Guests')),
+      appBar: AppBar(
+        title: const Text('Guests'),
+        actions: [
+          guestsForExport.maybeWhen(
+            data: (guests) => IconButton(
+              icon: _exporting
+                  ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.download_outlined),
+              tooltip: 'Export guest list (CSV)',
+              onPressed: (guests.isEmpty || _exporting) ? null : () => _exportCsv(guests),
+            ),
+            orElse: () => const SizedBox.shrink(),
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
       body: ecardAsync.when(
         loading: () => const LoadingIndicator(),
         error: (e, _) => AppErrorWidget(message: 'Could not load this E-Card'),

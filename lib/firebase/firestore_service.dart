@@ -11,6 +11,7 @@ import '../models/blog_category.dart';
 import '../models/blog_post.dart';
 import '../models/ecard.dart';
 import '../models/ecard_guest.dart';
+import '../models/ecard_request.dart';
 import '../models/ecard_template.dart';
 
 /// Single point of access to Cloud Firestore. Screens/providers never
@@ -242,7 +243,17 @@ class FirestoreService {
         .orderBy('date')
         .limit(limit)
         .snapshots()
-        .map((snap) => snap.docs.map((d) => Event.fromMap(d.id, d.data())).toList());
+        .map((snap) => snap.docs
+            .map((d) => Event.fromMap(d.id, d.data()))
+            // Client-side, not a query filter -- same reasoning as
+            // Musician.disabled: a where('is_published', isEqualTo:
+            // true) would exclude every event that predates this
+            // field (Firestore equality doesn't match a missing
+            // field), silently emptying the public listing until a
+            // backfill ran. Filtering after the fact needs no
+            // migration and is correct immediately.
+            .where((e) => e.isPublished)
+            .toList());
   }
 
   Stream<Event?> watchEvent(String id) {
@@ -285,6 +296,67 @@ class FirestoreService {
         .limit(limit)
         .snapshots()
         .map((snap) => snap.docs.map((d) => Event.fromMap(d.id, d.data())).toList());
+  }
+
+  Future<void> updateEventPublished(String eventId, bool isPublished) {
+    return _db.collection(AppStrings.eventsCollection).doc(eventId).update({'is_published': isPublished});
+  }
+
+  // ---------------- E-Card Requests ----------------
+  // Admin-approval gate for creating an E-Card for a specific event.
+  // See firestore.rules — an organizer can only create their own
+  // request as 'pending', only an admin can resolve it.
+
+  CollectionReference<Map<String, dynamic>> get _ecardRequestsRef =>
+      _db.collection(AppStrings.ecardRequestsCollection);
+
+  Future<String> createEcardRequest({required String organizerId, required String eventId}) async {
+    final ref = await _ecardRequestsRef.add(
+      EcardRequest(id: '', organizerId: organizerId, eventId: eventId).toMap(),
+    );
+    return ref.id;
+  }
+
+  /// The latest request for this (organizer, event) pair — a
+  /// rejected request can be followed by a new one, so this always
+  /// reflects the most recent attempt, not the full history.
+  Stream<EcardRequest?> watchLatestEcardRequestForEvent(String organizerId, String eventId) {
+    return _ecardRequestsRef
+        .where('organizer_id', isEqualTo: organizerId)
+        .where('event_id', isEqualTo: eventId)
+        .orderBy('created_at', descending: true)
+        .limit(1)
+        .snapshots()
+        .map((snap) => snap.docs.isEmpty ? null : EcardRequest.fromMap(snap.docs.first.id, snap.docs.first.data()));
+  }
+
+  /// Admin's live badge count — this is the mechanism that stands in
+  /// for a notification here (see EcardRequest's doc comment for why
+  /// this isn't using the notifications/ collection).
+  Stream<int> watchPendingEcardRequestCount() {
+    return _ecardRequestsRef.where('status', isEqualTo: 'pending').snapshots().map((snap) => snap.docs.length);
+  }
+
+  Stream<List<EcardRequest>> watchAllEcardRequestsForAdmin({int limit = 200}) {
+    return _ecardRequestsRef
+        .orderBy('created_at', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map((snap) => snap.docs.map((d) => EcardRequest.fromMap(d.id, d.data())).toList());
+  }
+
+  Future<void> resolveEcardRequest(
+    String requestId, {
+    required bool approved,
+    String? reply,
+    required String adminUid,
+  }) {
+    return _ecardRequestsRef.doc(requestId).update({
+      'status': approved ? 'approved' : 'rejected',
+      'admin_reply': reply,
+      'resolved_at': FieldValue.serverTimestamp(),
+      'resolved_by': adminUid,
+    });
   }
 
   // ---------------- Blog ----------------

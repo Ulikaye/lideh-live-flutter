@@ -52,36 +52,21 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
       time: _time?.format(context),
       location: _locationController.text.trim(),
       description: _descriptionController.text.trim(),
+      // New events start as drafts, not published — the organizer
+      // publishes explicitly from the event's own detail page
+      // (event_detail_screen.dart) whenever they're ready, rather
+      // than everything going live the instant it's created.
+      isPublished: false,
     );
     try {
       final id = await ref.read(firestoreServiceProvider).createEvent(event);
-      if (mounted) await _promptForEcard(id);
+      // No interrupting dialog here anymore — straight to the event's
+      // own page, where "Create E-Card" is a persistent, always-there
+      // option (not just a one-time prompt right after creation), and
+      // the publish toggle lives too.
+      if (mounted) context.go('/events/$id');
     } finally {
       if (mounted) setState(() => _saving = false);
-    }
-  }
-
-  /// Added for the E-Card service: offers to create a digital
-  /// invitation for the event that was just published. Purely
-  /// additive to the existing submit flow — declining behaves exactly
-  /// as before (context.go('/events/$id')).
-  Future<void> _promptForEcard(String eventId) async {
-    final create = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Create an E-Card for this event?'),
-        content: const Text('You can add a digital invitation with guest management and QR check-in.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('No, continue')),
-          ElevatedButton(onPressed: () => Navigator.of(context).pop(true), child: const Text('Yes, create E-Card')),
-        ],
-      ),
-    );
-    if (!mounted) return;
-    if (create == true) {
-      context.go('/e-cards/create?eventId=$eventId');
-    } else {
-      context.go('/events/$eventId');
     }
   }
 
@@ -141,7 +126,7 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
                     onPressed: _saving ? null : _submit,
                     child: _saving
                         ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                        : const Text('Publish Event'),
+                        : const Text('Create Event'),
                   ),
                 ],
               ),
