@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart'; // ✅ Added for date formatting
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/strings.dart';
 import '../../../core/utils/validators.dart';
@@ -23,18 +24,49 @@ import '../../../shared/widgets/loading_indicator.dart';
 /// StorageService, same pattern as edit_profile_screen.dart's avatar
 /// upload, never base64-in-Firestore.
 const _fallbackFields = <EcardOccasion, List<String>>{
-  EcardOccasion.wedding: ['bride_name', 'groom_name', 'wedding_date', 'venue', 'bride_image_url', 'groom_image_url', 'single_amount', 'double_amount'],
-  EcardOccasion.worship: ['church_name', 'service_title', 'date', 'time', 'venue', 'theme'],
-  EcardOccasion.conference: ['title', 'organizer_name', 'date', 'time', 'venue', 'description'],
+  EcardOccasion.wedding: [
+    'bride_name',
+    'groom_name',
+    'wedding_date',
+    'venue',
+    'bride_image_url',
+    'groom_image_url',
+    'single_amount',
+    'double_amount'
+  ],
+  EcardOccasion.worship: [
+    'church_name',
+    'service_title',
+    'date',
+    'time',
+    'venue',
+    'theme'
+  ],
+  EcardOccasion.conference: [
+    'title',
+    'organizer_name',
+    'date',
+    'time',
+    'venue',
+    'description'
+  ],
   EcardOccasion.other: ['title', 'date', 'time', 'venue', 'description'],
 };
 
 bool _isImageField(String key) => key.endsWith('_image_url');
 
+/// ✅ New helpers to detect date/time fields
+bool _isDateField(String key) => key.toLowerCase().contains('date');
+bool _isTimeField(String key) => key.toLowerCase().contains('time');
+
 String _humanize(String key) {
-  final base = key.endsWith('_image_url') ? key.substring(0, key.length - '_image_url'.length) : key;
+  final base = key.endsWith('_image_url')
+      ? key.substring(0, key.length - '_image_url'.length)
+      : key;
   final words = base.replaceAll('_', ' ').split(' ');
-  return words.map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}').join(' ');
+  return words
+      .map((w) => w.isEmpty ? w : '${w[0].toUpperCase()}${w.substring(1)}')
+      .join(' ');
 }
 
 class CreateEcardScreen extends ConsumerStatefulWidget {
@@ -59,21 +91,28 @@ class _CreateEcardScreenState extends ConsumerState<CreateEcardScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _saving = false;
 
+  // ✅ Maps to store actual ISO values for date/time while keeping display text in controllers
+  final _storedDateValues = <String, String>{};
+  final _storedTimeValues = <String, String>{};
+
   Widget _buildStep() {
     if (_eventId == null) {
       return _EventPickerStep(onPicked: (id) => setState(() => _eventId = id));
     }
     final organizerId = ref.read(authServiceProvider).currentUser!.uid;
-    final requestAsync = ref.watch(ecardRequestForEventProvider((organizerId, _eventId!)));
+    final requestAsync =
+        ref.watch(ecardRequestForEventProvider((organizerId, _eventId!)));
     return requestAsync.when(
       loading: () => const LoadingIndicator(),
-      error: (e, _) => AppErrorWidget(message: 'Could not check approval status'),
+      error: (e, _) =>
+          AppErrorWidget(message: 'Could not check approval status'),
       data: (EcardRequest? request) {
         if (request == null || request.isRejected) {
           return _ApprovalGateStep(
             organizerId: organizerId,
             eventId: _eventId!,
-            rejectedReply: request?.isRejected == true ? request!.adminReply : null,
+            rejectedReply:
+                request?.isRejected == true ? request!.adminReply : null,
           );
         }
         if (request.isPending) {
@@ -81,7 +120,8 @@ class _CreateEcardScreenState extends ConsumerState<CreateEcardScreen> {
         }
         // approved
         if (_occasion == null) {
-          return _OccasionPickerStep(onPicked: (o) => setState(() => _occasion = o));
+          return _OccasionPickerStep(
+              onPicked: (o) => setState(() => _occasion = o));
         }
         if (_template == null && !_useFallbackFields) {
           return _TemplatePickerStep(
@@ -117,7 +157,8 @@ class _CreateEcardScreenState extends ConsumerState<CreateEcardScreen> {
 
   Future<void> _pickAndUploadImage(String key) async {
     final picker = ImagePicker();
-    final picked = await picker.pickImage(source: ImageSource.gallery, maxWidth: 800, imageQuality: 85);
+    final picked = await picker.pickImage(
+        source: ImageSource.gallery, maxWidth: 800, imageQuality: 85);
     if (picked == null) return;
     setState(() => _uploadingImage[key] = true);
     try {
@@ -133,9 +174,13 @@ class _CreateEcardScreenState extends ConsumerState<CreateEcardScreen> {
     }
   }
 
+  // ✅ Modified _submit to use stored ISO values for date/time fields
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    final missingImage = _activeFieldSchema.where(_isImageField).where((k) => (_imageUrls[k] ?? '').isEmpty).toList();
+    final missingImage = _activeFieldSchema
+        .where(_isImageField)
+        .where((k) => (_imageUrls[k] ?? '').isEmpty)
+        .toList();
     if (missingImage.isNotEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Please add ${_humanize(missingImage.first)}')),
@@ -144,10 +189,23 @@ class _CreateEcardScreenState extends ConsumerState<CreateEcardScreen> {
     }
     setState(() => _saving = true);
     final organizerId = ref.read(authServiceProvider).currentUser!.uid;
-    final fields = {
-      for (final e in _fieldControllers.entries) e.key: e.value.text.trim(),
-      for (final e in _imageUrls.entries) e.key: e.value ?? '',
-    };
+
+    // Build fields map, using stored ISO values for date/time, controller text for others
+    final fields = <String, String>{};
+    for (final e in _fieldControllers.entries) {
+      if (_storedDateValues.containsKey(e.key)) {
+        fields[e.key] = _storedDateValues[e.key]!;
+      } else if (_storedTimeValues.containsKey(e.key)) {
+        fields[e.key] = _storedTimeValues[e.key]!;
+      } else {
+        fields[e.key] = e.value.text.trim();
+      }
+    }
+    // Add image URLs
+    for (final e in _imageUrls.entries) {
+      fields[e.key] = e.value ?? '';
+    }
+
     final ecard = Ecard(
       id: '',
       eventId: _eventId!,
@@ -188,16 +246,80 @@ class _CreateEcardScreenState extends ConsumerState<CreateEcardScreen> {
     );
   }
 
+  // ---- ✅ NEW: Date picker field ----
+  Widget _buildDatePickerField(String key) {
+    final controller = _fieldControllers[key]!;
+    return TextFormField(
+      controller: controller,
+      readOnly: true, // prevents manual typing
+      decoration: InputDecoration(
+        labelText: _humanize(key),
+        suffixIcon: const Icon(Icons.calendar_today_outlined),
+      ),
+      onTap: () async {
+        final picked = await showDatePicker(
+          context: context,
+          initialDate: DateTime.now(),
+          firstDate: DateTime(2000),
+          lastDate: DateTime(2100),
+        );
+        if (picked != null) {
+          final isoString = DateFormat('yyyy-MM-dd').format(picked);
+          final display = DateFormat.yMMMd().format(picked);
+          setState(() {
+            controller.text = display;
+            _storedDateValues[key] = isoString;
+          });
+        }
+      },
+      validator: (value) => Validators.required(value, field: _humanize(key)),
+    );
+  }
+
+  // ---- ✅ NEW: Time picker field ----
+  Widget _buildTimePickerField(String key) {
+    final controller = _fieldControllers[key]!;
+    return TextFormField(
+      controller: controller,
+      readOnly: true,
+      decoration: InputDecoration(
+        labelText: _humanize(key),
+        suffixIcon: const Icon(Icons.access_time_outlined),
+      ),
+      onTap: () async {
+        final picked = await showTimePicker(
+          context: context,
+          initialTime: TimeOfDay.now(),
+        );
+        if (picked != null) {
+          final hour = picked.hour.toString().padLeft(2, '0');
+          final minute = picked.minute.toString().padLeft(2, '0');
+          final isoTime = '$hour:$minute';
+          final display = picked.format(context); // localised format
+          setState(() {
+            controller.text = display;
+            _storedTimeValues[key] = isoTime;
+          });
+        }
+      },
+      validator: (value) => Validators.required(value, field: _humanize(key)),
+    );
+  }
+
   Widget _buildFieldForm() {
     return Form(
       key: _formKey,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(_occasion!.label, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+          Text(_occasion!.label,
+              style:
+                  const TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
           const SizedBox(height: 4),
           Text(
-            _template != null ? 'Template: ${_template!.name}' : 'Using default fields for this occasion',
+            _template != null
+                ? 'Template: ${_template!.name}'
+                : 'Using default fields for this occasion',
             style: const TextStyle(color: AppColors.textSecondary),
           ),
           const SizedBox(height: 20),
@@ -209,6 +331,10 @@ class _CreateEcardScreenState extends ConsumerState<CreateEcardScreen> {
                 uploading: _uploadingImage[key] ?? false,
                 onTap: () => _pickAndUploadImage(key),
               )
+            else if (_isDateField(key))
+              _buildDatePickerField(key)
+            else if (_isTimeField(key))
+              _buildTimePickerField(key)
             else
               TextFormField(
                 controller: _fieldControllers[key],
@@ -221,7 +347,11 @@ class _CreateEcardScreenState extends ConsumerState<CreateEcardScreen> {
           ElevatedButton(
             onPressed: _saving ? null : _submit,
             child: _saving
-                ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white))
                 : const Text('Create E-Card'),
           ),
         ],
@@ -230,12 +360,20 @@ class _CreateEcardScreenState extends ConsumerState<CreateEcardScreen> {
   }
 }
 
+// =========================================================================
+// Everything below this line is UNCHANGED from your original file.
+// =========================================================================
+
 class _ImageFieldPicker extends StatelessWidget {
   final String label;
   final String? url;
   final bool uploading;
   final VoidCallback onTap;
-  const _ImageFieldPicker({required this.label, required this.url, required this.uploading, required this.onTap});
+  const _ImageFieldPicker(
+      {required this.label,
+      required this.url,
+      required this.uploading,
+      required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -244,23 +382,32 @@ class _ImageFieldPicker extends StatelessWidget {
       borderRadius: BorderRadius.circular(8),
       child: Container(
         padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(border: Border.all(color: AppColors.border), borderRadius: BorderRadius.circular(8)),
+        decoration: BoxDecoration(
+            border: Border.all(color: AppColors.border),
+            borderRadius: BorderRadius.circular(8)),
         child: Row(
           children: [
             CircleAvatar(
               radius: 24,
               backgroundColor: AppColors.background,
-              backgroundImage: (url != null && url!.isNotEmpty) ? NetworkImage(url!) : null,
+              backgroundImage:
+                  (url != null && url!.isNotEmpty) ? NetworkImage(url!) : null,
               child: uploading
-                  ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                  ? const SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2))
                   : (url == null || url!.isEmpty)
-                      ? const Icon(Icons.add_a_photo_outlined, color: AppColors.textSecondary)
+                      ? const Icon(Icons.add_a_photo_outlined,
+                          color: AppColors.textSecondary)
                       : null,
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                (url != null && url!.isNotEmpty) ? '$label — tap to change' : 'Add $label',
+                (url != null && url!.isNotEmpty)
+                    ? '$label — tap to change'
+                    : 'Add $label',
                 style: const TextStyle(color: AppColors.textSecondary),
               ),
             ),
@@ -299,7 +446,8 @@ class _EventPickerStep extends ConsumerWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('Which event is this E-Card for?', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            const Text('Which event is this E-Card for?',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
             const SizedBox(height: 16),
             for (final event in events) ...[
               _ExistingEcardGuard(
@@ -331,11 +479,13 @@ class _ExistingEcardGuard extends ConsumerWidget {
   final String eventId;
   final String organizerId;
   final Widget child;
-  const _ExistingEcardGuard({required this.eventId, required this.organizerId, required this.child});
+  const _ExistingEcardGuard(
+      {required this.eventId, required this.organizerId, required this.child});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final existing = ref.watch(ecardForEventProvider((eventId, organizerId))).value;
+    final existing =
+        ref.watch(ecardForEventProvider((eventId, organizerId))).value;
     if (existing == null) return child;
     return Card(
       color: AppColors.background,
@@ -359,7 +509,8 @@ class _ApprovalGateStep extends ConsumerStatefulWidget {
   /// rejected — shown so the organizer knows why before sending
   /// another one, rather than it feeling like a mystery re-block.
   final String? rejectedReply;
-  const _ApprovalGateStep({required this.organizerId, required this.eventId, this.rejectedReply});
+  const _ApprovalGateStep(
+      {required this.organizerId, required this.eventId, this.rejectedReply});
 
   @override
   ConsumerState<_ApprovalGateStep> createState() => _ApprovalGateStepState();
@@ -371,9 +522,8 @@ class _ApprovalGateStepState extends ConsumerState<_ApprovalGateStep> {
   Future<void> _sendRequest() async {
     setState(() => _sending = true);
     try {
-      await ref
-          .read(firestoreServiceProvider)
-          .createEcardRequest(organizerId: widget.organizerId, eventId: widget.eventId);
+      await ref.read(firestoreServiceProvider).createEcardRequest(
+          organizerId: widget.organizerId, eventId: widget.eventId);
       // No manual navigation needed — CreateEcardScreen._buildStep is
       // watching this exact (organizerId, eventId) request live, so it
       // swaps to _ApprovalPendingStep on its own the moment this new
@@ -388,7 +538,8 @@ class _ApprovalGateStepState extends ConsumerState<_ApprovalGateStep> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Icon(Icons.verified_user_outlined, size: 40, color: AppColors.primary),
+        const Icon(Icons.verified_user_outlined,
+            size: 40, color: AppColors.primary),
         const SizedBox(height: 12),
         const Text(
           'This needs admin approval',
@@ -407,7 +558,11 @@ class _ApprovalGateStepState extends ConsumerState<_ApprovalGateStep> {
         ElevatedButton(
           onPressed: _sending ? null : _sendRequest,
           child: _sending
-              ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+              ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: Colors.white))
               : const Text('Send request'),
         ),
       ],
@@ -422,9 +577,12 @@ class _ApprovalPendingStep extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Column(
       children: [
-        Icon(Icons.hourglass_top_outlined, size: 40, color: AppColors.textSecondary),
+        Icon(Icons.hourglass_top_outlined,
+            size: 40, color: AppColors.textSecondary),
         SizedBox(height: 12),
-        Text('Waiting for admin approval', textAlign: TextAlign.center, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+        Text('Waiting for admin approval',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
         SizedBox(height: 8),
         Text(
           'You\'ll move to the next step automatically as soon as this is approved.',
@@ -445,7 +603,8 @@ class _OccasionPickerStep extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text('What kind of occasion is this?', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+        const Text('What kind of occasion is this?',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
         const SizedBox(height: 16),
         for (final occasion in EcardOccasion.values) ...[
           Card(
@@ -466,7 +625,8 @@ class _TemplatePickerStep extends ConsumerWidget {
   final EcardOccasion occasion;
   final ValueChanged<EcardTemplate> onPicked;
   final VoidCallback onSkip;
-  const _TemplatePickerStep({required this.occasion, required this.onPicked, required this.onSkip});
+  const _TemplatePickerStep(
+      {required this.occasion, required this.onPicked, required this.onSkip});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -482,9 +642,11 @@ class _TemplatePickerStep extends ConsumerWidget {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Text('No templates yet for this occasion', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+              const Text('No templates yet for this occasion',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
               const SizedBox(height: 8),
-              const Text('You can continue with the default fields for now.', style: TextStyle(color: AppColors.textSecondary)),
+              const Text('You can continue with the default fields for now.',
+                  style: TextStyle(color: AppColors.textSecondary)),
               const SizedBox(height: 20),
               ElevatedButton(onPressed: onSkip, child: const Text('Continue')),
             ],
@@ -493,7 +655,8 @@ class _TemplatePickerStep extends ConsumerWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('Choose a template', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            const Text('Choose a template',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
             const SizedBox(height: 16),
             for (final template in templates) ...[
               Card(

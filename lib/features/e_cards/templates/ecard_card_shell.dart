@@ -5,35 +5,30 @@ import '../../../core/constants/strings.dart';
 
 /// Shared visual chrome for every occasion's card design — background
 /// gradient keyed to the occasion, consistent padding/rounding, and
-/// the QR corner. Occasion-specific templates (wedding/worship/
-/// conference) supply only their content via [child]; this keeps a
-/// 4th/5th occasion's template to "new content builder", never a
-/// rewrite of the card shape itself.
+/// the QR corner.
 class EcardCardShell extends StatelessWidget {
   final EcardOccasion occasion;
   final Widget child;
-
-  /// The QR payload for THIS card. Null when there's no guest yet
-  /// (e.g. previewing a template before any guest exists) — shows a
-  /// placeholder box instead of generating a code for nothing.
   final String? qrData;
-
-  /// Lets a specific template override the occasion's default accent
-  /// (e.g. the wedding redesign's sage green) without every occasion
-  /// needing its own shell variant. Null uses [_accent] as before.
   final Color? accentOverride;
 
-  const EcardCardShell({super.key, required this.occasion, required this.child, this.qrData, this.accentOverride});
+  const EcardCardShell({
+    super.key,
+    required this.occasion,
+    required this.child,
+    this.qrData,
+    this.accentOverride,
+  });
 
   Color get _accent {
     if (accentOverride != null) return accentOverride!;
     switch (occasion) {
       case EcardOccasion.wedding:
-        return const Color(0xFF6B8F5A); // sage green — matches the botanical wedding redesign
+        return const Color(0xFFD4A5A5); // soft rose
       case EcardOccasion.worship:
-        return AppColors.primary;
+        return const Color(0xFF6C5B7B); // deep lavender
       case EcardOccasion.conference:
-        return AppColors.secondary;
+        return const Color(0xFF2C3E50); // navy
       case EcardOccasion.other:
         return AppColors.primaryDark;
     }
@@ -45,16 +40,35 @@ class EcardCardShell extends StatelessWidget {
       aspectRatio: 5 / 7,
       child: Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: _accent.withValues(alpha: 0.25), width: 1.5),
+          borderRadius: BorderRadius.circular(28),
           gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [_accent.withValues(alpha: 0.08), AppColors.surface],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              _accent.withValues(alpha: 0.12),
+              Colors.white.withValues(alpha: 0.95),
+              _accent.withValues(alpha: 0.06),
+            ],
           ),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 16, offset: const Offset(0, 8))],
+          border: Border.all(
+            color: _accent.withValues(alpha: 0.3),
+            width: 1.8,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.10),
+              blurRadius: 30,
+              offset: const Offset(0, 12),
+              spreadRadius: 2,
+            ),
+            BoxShadow(
+              color: _accent.withValues(alpha: 0.15),
+              blurRadius: 40,
+              offset: const Offset(0, 0),
+            ),
+          ],
         ),
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -77,36 +91,62 @@ class _QrCorner extends StatelessWidget {
   Widget build(BuildContext context) {
     if (qrData == null) {
       return Container(
-        width: 64,
-        height: 64,
+        width: 68,
+        height: 68,
         decoration: BoxDecoration(
-          color: accent.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: accent.withValues(alpha: 0.3)),
+          color: accent.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: accent.withValues(alpha: 0.25)),
         ),
-        child: Icon(Icons.qr_code_2_rounded, color: accent.withValues(alpha: 0.5), size: 32),
+        child: Icon(
+          Icons.qr_code_2_rounded,
+          color: accent.withValues(alpha: 0.5),
+          size: 34,
+        ),
       );
     }
     return Container(
-      padding: const EdgeInsets.all(6),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8), border: Border.all(color: accent.withValues(alpha: 0.3))),
-      child: QrImageView(data: qrData!, size: 64, backgroundColor: Colors.white),
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: accent.withValues(alpha: 0.3)),
+        boxShadow: [
+          BoxShadow(
+            color: accent.withValues(alpha: 0.15),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child:
+          QrImageView(data: qrData!, size: 68, backgroundColor: Colors.white),
     );
   }
 }
 
-/// Formats a stored field value for display: dates typed as ISO
-/// strings (yyyy-mm-dd) render as "12 Jan 2027"; everything else
-/// passes through unchanged. Kept forgiving on purpose since
-/// Ecard.fields is a loose map, not a typed model — a malformed date
-/// string just falls back to showing itself.
+/// Formats a stored field value for display.
 String formatEcardFieldValue(String key, dynamic value) {
   final str = '$value';
-  final looksLikeDate = key.contains('date') && RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(str);
+  final looksLikeDate =
+      key.contains('date') && RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(str);
   if (!looksLikeDate) return str;
   try {
     final d = DateTime.parse(str);
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
+    ];
     return '${d.day} ${months[d.month - 1]} ${d.year}';
   } catch (_) {
     return str;

@@ -33,6 +33,7 @@ dependencies:
   url_launcher: ^6.3.0
   flutter_rating_bar: ^4.0.1
   file_picker: ^8.0.6
+  google_fonts: ^6.2.1 
 
   # Utilities
   uuid: ^4.4.2
