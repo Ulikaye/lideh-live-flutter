@@ -22,6 +22,10 @@ import '../../features/blog/blog_detail_screen.dart';
 import '../../features/admin/admin_blog_list_screen.dart';
 import '../../features/admin/admin_blog_editor_screen.dart';
 import '../../features/admin/admin_ecard_list_screen.dart';
+import '../../features/admin/admin_ecard_requests_screen.dart';
+import '../../features/admin/admin_messages_screen.dart';
+import '../../features/admin/admin_message_thread_screen.dart';
+import '../../features/messages/user_message_screen.dart';
 import '../../features/admin/admin_user_list_screen.dart';
 import '../../features/admin/admin_event_list_screen.dart';
 import '../../features/authentication/account_deactivated_screen.dart';
@@ -167,8 +171,19 @@ final routerProvider = Provider<GoRouter>((ref) {
                 child: AdminBlogEditorScreen(postId: s.pathParameters['id'])),
           ),
           GoRoute(path: '/admin/e-cards', builder: (_, __) => const AdminEcardListScreen()),
+          GoRoute(path: '/admin/ecard-requests', builder: (_, __) => const AdminEcardRequestsScreen()),
           GoRoute(path: '/admin/users', builder: (_, __) => const AdminUserListScreen()),
           GoRoute(path: '/admin/events', builder: (_, __) => const AdminEventListScreen()),
+          GoRoute(path: '/admin/messages', builder: (_, __) => const AdminMessagesScreen()),
+          GoRoute(
+            path: '/admin/messages/:uid',
+            pageBuilder: (_, s) => slideTransitionPage(
+                state: s, child: AdminMessageThreadScreen(uid: s.pathParameters['uid']!)),
+          ),
+          GoRoute(
+            path: '/messages',
+            pageBuilder: (_, s) => slideTransitionPage(state: s, child: const UserMessageScreen()),
+          ),
           GoRoute(
               path: '/account-deactivated',
               builder: (_, __) => const AccountDeactivatedScreen()),

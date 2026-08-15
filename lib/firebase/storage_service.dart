@@ -16,11 +16,15 @@ class StorageService {
     required String folder,
     required Uint8List bytes,
     required String extension,
+    String? contentType,
     void Function(double progress)? onProgress,
   }) async {
     final fileName = '${_uuid.v4()}.$extension';
     final ref = _storage.ref().child('$folder/$fileName');
-    final task = ref.putData(bytes);
+    final task = ref.putData(
+      bytes,
+      SettableMetadata(contentType: contentType ?? _contentTypeFor(extension)),
+    );
 
     task.snapshotEvents.listen((snapshot) {
       if (onProgress != null && snapshot.totalBytes > 0) {
@@ -30,6 +34,29 @@ class StorageService {
 
     await task;
     return ref.getDownloadURL();
+  }
+
+  /// Falls back to a sensible MIME type from the file extension when the
+  /// caller doesn't supply one explicitly (e.g. web bytes from
+  /// image_picker often carry no type metadata of their own).
+  String _contentTypeFor(String extension) {
+    switch (extension.toLowerCase()) {
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'gif':
+        return 'image/gif';
+      case 'webp':
+        return 'image/webp';
+      case 'mp4':
+        return 'video/mp4';
+      case 'mov':
+        return 'video/quicktime';
+      default:
+        return 'application/octet-stream';
+    }
   }
 
   /// Deletes a previously uploaded file given its full download URL,

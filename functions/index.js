@@ -211,12 +211,13 @@ ${urls.map((u) => `  <url><loc>${baseUrl}${u}</loc></url>`).join('\n')}
 // Firestore notification document is the source of truth; push is a
 // bonus on top of it.
 // ---------------------------------------------------------------------------
-async function notifyUser({ userId, title, body, bookingId }) {
+async function notifyUser({ userId, title, body, bookingId, route }) {
   await db.collection('notifications').add({
     user_id: userId,
     title,
     body,
-    booking_id: bookingId,
+    booking_id: bookingId || null,
+    route: route || null,
     read: false,
     created_at: admin.firestore.FieldValue.serverTimestamp(),
   });
@@ -228,12 +229,23 @@ async function notifyUser({ userId, title, body, bookingId }) {
       await admin.messaging().send({
         token,
         notification: { title, body },
-        data: { booking_id: bookingId || '' },
+        data: { booking_id: bookingId || '', route: route || '' },
       });
     }
   } catch (e) {
     functions.logger.warn('FCM push failed (notification document was still saved)', e);
   }
+}
+
+/// Fans a notification out to every admin account — used for events
+/// that don't have one single obvious recipient (a new registration,
+/// a new E-Card request), unlike booking notifications which always
+/// have exactly one other party to notify.
+async function notifyAllAdmins({ title, body, route }) {
+  const adminsSnap = await db.collection('users').where('user_type', '==', 'admin').get();
+  await Promise.all(
+    adminsSnap.docs.map((doc) => notifyUser({ userId: doc.id, title, body, route }))
+  );
 }
 
 exports.onBookingCreated = functions.firestore
@@ -291,6 +303,98 @@ exports.onBookingUpdated = functions.firestore
     const message = messages[after.status];
     if (message) {
       await notifyUser({ ...message, bookingId });
+    }
+  });
+
+// ---------------------------------------------------------------------------
+// New-account notifications — every musician/organizer registers
+// unverified by default (see firestore.rules' isVerifiedOrganizer()
+// and the Musician/UserProfile model doc comments). Admin needs to
+// know a new account is waiting on a decision without having to
+// remember to go check Manage Users periodically.
+// ---------------------------------------------------------------------------
+exports.onUserCreated = functions.firestore
+  .document('users/{uid}')
+  .onCreate(async (snap) => {
+    const user = snap.data();
+    if (user.user_type !== 'musician' && user.user_type !== 'organizer') return; // admins aren't verification-gated
+
+    const roleLabel = user.user_type === 'musician' ? 'musician' : 'organizer';
+    await notifyAllAdmins({
+      title: 'New account pending verification',
+      body: `${user.display_name || user.email} registered as a ${roleLabel} and is waiting for verification.`,
+      route: '/admin/users',
+    });
+  });
+
+// ---------------------------------------------------------------------------
+// E-Card request notifications — closes the gap flagged in the
+// original approval-workflow batch: requests previously only showed
+// up as a live badge count on the profile menu, not in the actual
+// notification inbox. Both now happen side by side; the badge count
+// still works exactly as before (it's a separate live query, not
+// fed by these notification documents).
+// ---------------------------------------------------------------------------
+exports.onEcardRequestCreated = functions.firestore
+  .document('ecard_requests/{requestId}')
+  .onCreate(async (snap) => {
+    const req = snap.data();
+    const organizerDoc = await db.collection('users').doc(req.organizer_id).get();
+    const organizerName = organizerDoc.exists ? (organizerDoc.data().display_name || organizerDoc.data().email) : 'An organizer';
+
+    await notifyAllAdmins({
+      title: 'New E-Card request',
+      body: `${organizerName} requested approval to create an E-Card.`,
+      route: '/admin/ecard-requests',
+    });
+  });
+
+exports.onEcardRequestUpdated = functions.firestore
+  .document('ecard_requests/{requestId}')
+  .onUpdate(async (change) => {
+    const before = change.before.data();
+    const after = change.after.data();
+
+    if (before.status === after.status) return; // only react to the actual approve/reject decision
+    if (after.status !== 'approved' && after.status !== 'rejected') return;
+
+    await notifyUser({
+      userId: after.organizer_id,
+      title: after.status === 'approved' ? 'E-Card request approved' : 'E-Card request declined',
+      body: after.status === 'approved'
+        ? 'Your E-Card request was approved — you can create it now.'
+        : `Your E-Card request was declined.${after.admin_reply ? ` Reason: ${after.admin_reply}` : ''}`,
+      route: `/events/${after.event_id}`,
+    });
+  });
+
+// ---------------------------------------------------------------------------
+// Message notifications — a musician/organizer sending a message
+// notifies every admin (any admin can reply, not assigned per-admin,
+// same as the other admin-moderated collections). Admin replying
+// notifies that one specific user back.
+// ---------------------------------------------------------------------------
+exports.onMessageCreated = functions.firestore
+  .document('message_threads/{uid}/messages/{messageId}')
+  .onCreate(async (snap, context) => {
+    const message = snap.data();
+    const uid = context.params.uid;
+
+    if (message.sender_role === 'user') {
+      const userDoc = await db.collection('users').doc(uid).get();
+      const senderName = userDoc.exists ? (userDoc.data().display_name || userDoc.data().email) : 'A user';
+      await notifyAllAdmins({
+        title: `New message from ${senderName}`,
+        body: message.text.length > 80 ? `${message.text.slice(0, 80)}...` : message.text,
+        route: `/admin/messages/${uid}`,
+      });
+    } else if (message.sender_role === 'admin') {
+      await notifyUser({
+        userId: uid,
+        title: 'New reply from admin',
+        body: message.text.length > 80 ? `${message.text.slice(0, 80)}...` : message.text,
+        route: '/messages',
+      });
     }
   });
 

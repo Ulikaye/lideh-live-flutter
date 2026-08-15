@@ -24,6 +24,14 @@ class Musician {
   /// from discovery.
   final bool disabled;
 
+  /// Mirrors users/{uid}.verified, same reasoning as `disabled` above.
+  /// A musician stays out of the public directory — invisible to
+  /// organizers, not bookable — until an admin verifies the account.
+  /// The musician can still log in and edit their own profile while
+  /// pending; only public discovery is gated. Set together with the
+  /// user doc's `verified` field by FirestoreService.setUserVerified.
+  final bool verified;
+
   final DateTime? joinedAt;
 
   const Musician({
@@ -39,6 +47,7 @@ class Musician {
     this.avgRating = 0,
     this.reviewCount = 0,
     this.disabled = false,
+    this.verified = false,
     this.joinedAt,
   });
 
@@ -56,6 +65,7 @@ class Musician {
       avgRating: (map['avg_rating'] as num?)?.toDouble() ?? 0,
       reviewCount: map['review_count'] ?? 0,
       disabled: map['disabled'] ?? false,
+      verified: map['verified'] ?? false,
       joinedAt: (map['joined_at'] as Timestamp?)?.toDate(),
     );
   }
@@ -73,6 +83,7 @@ class Musician {
       'avg_rating': avgRating,
       'review_count': reviewCount,
       'disabled': disabled,
+      'verified': verified,
       'joined_at': joinedAt != null ? Timestamp.fromDate(joinedAt!) : FieldValue.serverTimestamp(),
     };
   }
@@ -99,6 +110,11 @@ class Musician {
       location: location ?? this.location,
       avgRating: avgRating,
       reviewCount: reviewCount,
+      // Both previously dropped here — meaning any self-edit via
+      // copyWith silently reset disabled/verified back to false on
+      // the next save, regardless of their real admin-set status.
+      disabled: disabled,
+      verified: verified,
       joinedAt: joinedAt,
     );
   }

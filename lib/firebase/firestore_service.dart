@@ -13,6 +13,8 @@ import '../models/ecard.dart';
 import '../models/ecard_guest.dart';
 import '../models/ecard_request.dart';
 import '../models/ecard_template.dart';
+import '../models/chat_message.dart';
+import '../models/message_thread.dart';
 
 /// Single point of access to Cloud Firestore. Screens/providers never
 /// talk to `FirebaseFirestore.instance` directly — everything routes
@@ -64,6 +66,22 @@ class FirestoreService {
     batch.update(_db.collection(AppStrings.usersCollection).doc(uid), {'disabled': disabled});
     if (userType == UserType.musician) {
       batch.update(_db.collection(AppStrings.musiciansCollection).doc(uid), {'disabled': disabled});
+    }
+    await batch.commit();
+  }
+
+  /// Admin verification gate: a musician stays out of the public
+  /// directory, and an organizer cannot create events, until this is
+  /// flipped to true. See the doc comments on UserProfile.verified and
+  /// Musician.verified for the full reasoning. Mirrors
+  /// setUserDisabled's exact batch-write shape — same two-collection
+  /// sync requirement, same reason (the public/gated query needs the
+  /// field on the document it's actually querying, not a join).
+  Future<void> setUserVerified(String uid, bool verified, {required UserType userType}) async {
+    final batch = _db.batch();
+    batch.update(_db.collection(AppStrings.usersCollection).doc(uid), {'verified': verified});
+    if (userType == UserType.musician) {
+      batch.update(_db.collection(AppStrings.musiciansCollection).doc(uid), {'verified': verified});
     }
     await batch.commit();
   }
@@ -129,6 +147,12 @@ class FirestoreService {
         // every doc was backfilled. This filters after the fact
         // instead — correct immediately, no migration required.
         .where((m) => !m.disabled)
+        // Same reasoning for verified: an unverified musician (the
+        // default for every new registration) stays out of public
+        // discovery until an admin approves them, but this is a
+        // client-side filter, not a query .where(), for the same
+        // missing-field-safety reason as disabled above.
+        .where((m) => m.verified)
         .toList());
   }
 
@@ -609,5 +633,83 @@ class FirestoreService {
         'checked_in_time': FieldValue.serverTimestamp(),
       });
     });
+  }
+  // ---------------- Messages (admin <-> musician/organizer) ----------------
+  // One thread per user, doc id == their own uid — same "keyed
+  // directly by uid" pattern as users/musicians/organizers, so
+  // finding "my thread" or "this user's thread" is always a direct
+  // doc lookup, never a query filter that could hit the same
+  // rules-vs-query mismatch we've fixed elsewhere in this project.
+
+  Stream<MessageThread?> watchMessageThread(String uid) {
+    return _db.collection(AppStrings.messageThreadsCollection).doc(uid).snapshots().map(
+        (doc) => doc.exists ? MessageThread.fromMap(uid, doc.data()!) : null);
+  }
+
+  Stream<List<ChatMessage>> watchMessagesForThread(String uid) {
+    return _db
+        .collection(AppStrings.messageThreadsCollection)
+        .doc(uid)
+        .collection('messages')
+        .orderBy('created_at')
+        .snapshots()
+        .map((snap) => snap.docs.map((d) => ChatMessage.fromMap(d.id, d.data())).toList());
+  }
+
+  /// Sends a message and updates the parent thread's summary in one
+  /// batch — both writes succeed or fail together, so the thread list
+  /// preview can never drift out of sync with the actual last message.
+  Future<void> sendMessage({
+    required String uid,
+    required String text,
+    required String senderId,
+    required String senderRole, // 'admin' or 'user'
+    required String userDisplayName,
+    required String userType,
+  }) async {
+    final threadRef = _db.collection(AppStrings.messageThreadsCollection).doc(uid);
+    final messageRef = threadRef.collection('messages').doc();
+
+    final batch = _db.batch();
+    batch.set(messageRef, ChatMessage(id: '', senderId: senderId, senderRole: senderRole, text: text).toMap());
+    batch.set(
+      threadRef,
+      MessageThread(
+        uid: uid,
+        userDisplayName: userDisplayName,
+        userType: userType,
+        lastMessage: text,
+        lastSenderRole: senderRole,
+        // The party who didn't just send it has something new to read;
+        // the sender's own unread flag clears since they're caught up.
+        unreadByAdmin: senderRole == 'user',
+        unreadByUser: senderRole == 'admin',
+      ).toMap(),
+      SetOptions(merge: true),
+    );
+    await batch.commit();
+  }
+
+  Future<void> toggleMessageLiked(String uid, String messageId, bool liked) {
+    return _db
+        .collection(AppStrings.messageThreadsCollection)
+        .doc(uid)
+        .collection('messages')
+        .doc(messageId)
+        .update({'liked': liked});
+  }
+
+  Future<void> markThreadRead(String uid, {required bool asAdmin}) {
+    return _db.collection(AppStrings.messageThreadsCollection).doc(uid).update({
+      asAdmin ? 'unread_by_admin' : 'unread_by_user': false,
+    });
+  }
+
+  Stream<List<MessageThread>> watchAllThreadsForAdmin() {
+    return _db
+        .collection(AppStrings.messageThreadsCollection)
+        .orderBy('last_message_at', descending: true)
+        .snapshots()
+        .map((snap) => snap.docs.map((d) => MessageThread.fromMap(d.id, d.data())).toList());
   }
 }

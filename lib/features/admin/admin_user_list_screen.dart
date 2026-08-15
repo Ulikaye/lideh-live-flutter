@@ -14,14 +14,24 @@ import '../../shared/widgets/loading_indicator.dart';
 /// app_router.dart); the underlying watchAllUsersForAdmin() query
 /// requires isAdmin() server-side regardless.
 ///
-/// Deactivate is the everyday action: reversible, blocks the
-/// account's dashboard access (app_router.dart's redirect gate) and,
-/// for musicians, hides them from the public directory immediately
-/// (FirestoreService.setUserDisabled mirrors the flag onto
-/// musicians/{uid} in the same batch). Delete is separated behind a
-/// second, more explicit confirmation — see the doc comment on
+/// Deactivate is the everyday action for controlling misbehaving
+/// accounts: reversible, blocks the account's dashboard access
+/// (app_router.dart's redirect gate) and, for musicians, hides them
+/// from the public directory immediately (FirestoreService.
+/// setUserDisabled mirrors the flag onto musicians/{uid} in the same
+/// batch). Delete is separated behind a second, more explicit
+/// confirmation — see the doc comment on
 /// FirestoreService.deleteUserAccount for what it does and does not
 /// do (it cannot remove the Firebase Auth credential itself).
+///
+/// Verify is the newer, separate approval gate: every new musician
+/// and organizer registers unverified by default (see
+/// UserProfile.verified / Musician.verified doc comments) — a
+/// musician stays out of the public directory, an organizer can't
+/// create events, until this is flipped on. Unverify exists mainly
+/// to correct a mistaken approval, not as a moderation tool the way
+/// deactivate is — deactivate is still the right action for an
+/// already-verified account that starts misbehaving.
 class AdminUserListScreen extends ConsumerWidget {
   const AdminUserListScreen({super.key});
 
@@ -38,15 +48,27 @@ class AdminUserListScreen extends ConsumerWidget {
         error: (e, _) => AppErrorWidget(message: 'Could not load users'),
         data: (users) {
           if (users.isEmpty) return const EmptyStateWidget(title: 'No users yet', icon: Icons.people_outline);
+
+          // Accounts waiting on a verification decision surface first
+          // — that's the queue an admin actually needs to work
+          // through regularly, versus the full list being mostly
+          // already-resolved accounts.
+          final sorted = [...users]..sort((a, b) {
+              final aPending = _canModerate(a) && !a.verified ? 0 : 1;
+              final bPending = _canModerate(b) && !b.verified ? 0 : 1;
+              return aPending.compareTo(bPending);
+            });
+
           return Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 800),
               child: ListView.separated(
                 padding: const EdgeInsets.all(16),
-                itemCount: users.length,
+                itemCount: sorted.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 8),
                 itemBuilder: (context, i) {
-                  final user = users[i];
+                  final user = sorted[i];
+                  final pendingVerification = _canModerate(user) && !user.verified;
                   return Card(
                     child: ListTile(
                       leading: CircleAvatar(
@@ -57,11 +79,20 @@ class AdminUserListScreen extends ConsumerWidget {
                             : null,
                       ),
                       title: Text(user.displayName ?? user.email),
-                      subtitle: Text('${_roleLabel(user.userType)} · ${user.email}${user.disabled ? " · Deactivated" : ""}'),
+                      subtitle: Text(
+                        '${_roleLabel(user.userType)} · ${user.email}'
+                        '${user.disabled ? " · Deactivated" : ""}'
+                        '${pendingVerification ? " · Pending verification" : ""}',
+                        style: pendingVerification ? const TextStyle(color: AppColors.warning, fontWeight: FontWeight.w600) : null,
+                      ),
                       trailing: _canModerate(user)
                           ? PopupMenuButton<String>(
                               onSelected: (value) => _handleAction(context, ref, user, value),
                               itemBuilder: (context) => [
+                                if (!user.verified)
+                                  const PopupMenuItem(value: 'verify', child: Text('Verify'))
+                                else
+                                  const PopupMenuItem(value: 'unverify', child: Text('Unverify')),
                                 if (user.disabled)
                                   const PopupMenuItem(value: 'reactivate', child: Text('Reactivate'))
                                 else
@@ -95,6 +126,31 @@ class AdminUserListScreen extends ConsumerWidget {
   Future<void> _handleAction(BuildContext context, WidgetRef ref, UserProfile user, String action) async {
     final service = ref.read(firestoreServiceProvider);
     final name = user.displayName ?? user.email;
+
+    if (action == 'verify' || action == 'unverify') {
+      final verifying = action == 'verify';
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(verifying ? 'Verify $name?' : 'Remove verification from $name?'),
+          content: Text(verifying
+              ? (user.userType == UserType.musician
+                  ? 'They will immediately appear in the public musician directory and become bookable.'
+                  : 'They will immediately be able to create and publish events.')
+              : (user.userType == UserType.musician
+                  ? 'They will be hidden from the public directory again immediately.'
+                  : 'They will lose the ability to create new events immediately. Existing events are unaffected.')),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
+            TextButton(onPressed: () => Navigator.of(context).pop(true), child: Text(verifying ? 'Verify' : 'Remove verification')),
+          ],
+        ),
+      );
+      if (confirmed == true) {
+        await service.setUserVerified(user.uid, verifying, userType: user.userType);
+      }
+      return;
+    }
 
     if (action == 'deactivate' || action == 'reactivate') {
       final disabling = action == 'deactivate';

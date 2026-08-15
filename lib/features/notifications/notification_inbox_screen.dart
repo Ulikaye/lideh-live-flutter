@@ -68,7 +68,10 @@ class _NotificationTile extends StatelessWidget {
           if (!notification.read) {
             await FirebaseFirestore.instance.collection('notifications').doc(notification.id).update({'read': true});
           }
-          if (notification.bookingId != null && context.mounted) {
+          if (!context.mounted) return;
+          if (notification.route != null) {
+            context.go(notification.route!);
+          } else if (notification.bookingId != null) {
             context.go('/bookings/${notification.bookingId}');
           }
         },

@@ -51,6 +51,7 @@ class _MusicianDashboardState extends ConsumerState<MusicianDashboard> with Sing
       ),
       body: Column(
         children: [
+          if (!profile.verified) const _PendingVerificationBanner(),
           _MusicianDetailsSummaryCard(uid: profile.uid),
           Expanded(
             child: bookingsAsync.when(
@@ -159,6 +160,42 @@ class _BookingListTab extends StatelessWidget {
           separatorBuilder: (_, __) => const SizedBox(height: 12),
           itemBuilder: (context, i) => BookingCard(booking: bookings[i]),
         ),
+      ),
+    );
+  }
+}
+
+/// Shown at the top of the dashboard while an admin hasn't verified
+/// this musician yet — explains why their profile isn't showing up
+/// for organizers, since that's otherwise invisible and confusing:
+/// everything else on the dashboard (editing details, viewing
+/// bookings) works normally while pending, only public discovery is
+/// gated.
+class _PendingVerificationBanner extends StatelessWidget {
+  const _PendingVerificationBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.hourglass_top_rounded, color: AppColors.warning, size: 20),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Text(
+              "Your account is pending admin verification. You can edit your profile now, but you won't appear in the public directory until you're approved.",
+              style: TextStyle(fontSize: 13),
+            ),
+          ),
+        ],
       ),
     );
   }

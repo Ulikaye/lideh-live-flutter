@@ -26,6 +26,7 @@ class AppStrings {
   static const ecardTemplatesCollection = 'ecard_templates';
   static const ecardGuestsSubcollection = 'guests';
   static const ecardRequestsCollection = 'ecard_requests';
+  static const messageThreadsCollection = 'message_threads';
 
   // Storage paths
   static const profilePicturesPath = 'profile_pictures';

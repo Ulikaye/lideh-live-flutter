@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/strings.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/ecard_provider.dart';
+import '../../providers/message_provider.dart';
 
 /// Persistent profile/logout access point. Every top-level screen
 /// (Home, Musicians, Events, Blog, Dashboard) includes this in its
@@ -16,6 +18,13 @@ class ProfileMenuButton extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final profile = ref.watch(currentUserProfileProvider).value;
+    final isAdmin = profile?.userType == UserType.admin;
+    // Only queried for actual admins — this collection's rules
+    // require isAdmin() to read at all, so watching it for every
+    // musician/organizer would just be a permission-denied query
+    // firing on every screen for no reason.
+    final pendingRequestCount = isAdmin ? ref.watch(pendingEcardRequestCountProvider).value ?? 0 : 0;
+    final unreadThreadCount = isAdmin ? ref.watch(unreadThreadCountForAdminProvider) : 0;
 
     return PopupMenuButton<String>(
       tooltip: 'Account',
@@ -27,10 +36,16 @@ class ProfileMenuButton extends ConsumerWidget {
           context.go('/admin/blog');
         } else if (value == 'admin_ecards') {
           context.go('/admin/e-cards');
+        } else if (value == 'admin_ecard_requests') {
+          context.go('/admin/ecard-requests');
         } else if (value == 'admin_users') {
           context.go('/admin/users');
         } else if (value == 'admin_events') {
           context.go('/admin/events');
+        } else if (value == 'admin_messages') {
+          context.go('/admin/messages');
+        } else if (value == 'my_messages') {
+          context.go('/messages');
         } else if (value == 'signout') {
           await ref.read(authServiceProvider).signOut();
           if (context.mounted) context.go('/login');
@@ -47,7 +62,7 @@ class ProfileMenuButton extends ConsumerWidget {
             ],
           ),
         ),
-        if (profile?.userType == UserType.admin) ...[
+        if (isAdmin) ...[
           const PopupMenuItem(
             value: 'admin_blog',
             child: Row(
@@ -65,6 +80,27 @@ class ProfileMenuButton extends ConsumerWidget {
                 Icon(Icons.mail_outline_rounded, size: 18, color: AppColors.textSecondary),
                 SizedBox(width: 10),
                 Text('Manage E-Cards'),
+              ],
+            ),
+          ),
+          PopupMenuItem(
+            value: 'admin_ecard_requests',
+            child: Row(
+              children: [
+                const Icon(Icons.pending_actions_outlined, size: 18, color: AppColors.textSecondary),
+                const SizedBox(width: 10),
+                const Text('E-Card Requests'),
+                if (pendingRequestCount > 0) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(color: AppColors.danger, borderRadius: BorderRadius.circular(10)),
+                    child: Text(
+                      pendingRequestCount > 9 ? '9+' : '$pendingRequestCount',
+                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -88,7 +124,38 @@ class ProfileMenuButton extends ConsumerWidget {
               ],
             ),
           ),
-        ],
+          PopupMenuItem(
+            value: 'admin_messages',
+            child: Row(
+              children: [
+                const Icon(Icons.forum_outlined, size: 18, color: AppColors.textSecondary),
+                const SizedBox(width: 10),
+                const Text('Messages'),
+                if (unreadThreadCount > 0) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(color: AppColors.danger, borderRadius: BorderRadius.circular(10)),
+                    child: Text(
+                      unreadThreadCount > 9 ? '9+' : '$unreadThreadCount',
+                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ] else
+          const PopupMenuItem(
+            value: 'my_messages',
+            child: Row(
+              children: [
+                Icon(Icons.forum_outlined, size: 18, color: AppColors.textSecondary),
+                SizedBox(width: 10),
+                Text('Message Admin'),
+              ],
+            ),
+          ),
         const PopupMenuItem(
           value: 'signout',
           child: Row(

@@ -49,6 +49,14 @@ rules_version = '2';
 // dashboard, not in any directory) even though the bare login
 // credential technically still exists until that Cloud Function is
 // deployed.
+//
+// disabled field default handling: any account that has never been
+// deactivated has NO `disabled` field on its document at all —
+// accessing a missing field directly (resource.data.disabled) throws
+// an error in Firestore rules rather than returning false, which
+// would incorrectly deny a normal user's own profile edit. Every
+// comparison against `disabled` below uses .get('disabled', false)
+// specifically to avoid that.
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -80,7 +88,9 @@ service cloud.firestore {
           && request.resource.data.user_type == resource.data.user_type
           // The owner can change anything about their own profile
           // except `disabled` — only an admin may flip that (below).
-          && request.resource.data.disabled == resource.data.disabled)
+          // .get(field, default) avoids throwing on accounts that have
+          // never been deactivated and so have no `disabled` field yet.
+          && request.resource.data.get('disabled', false) == resource.data.get('disabled', false))
         || (isAdmin()
           // Admin's only allowed write here is the disabled flag —
           // nothing else about another user's profile, ever.
@@ -92,9 +102,9 @@ service cloud.firestore {
     match /musicians/{uid} {
       allow read: if true; // public directory — the browse query itself filters out disabled == true
       allow create: if isOwner(uid);
-      allow update: if (isOwner(uid) && request.resource.data.disabled == resource.data.disabled)
-        || (isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['disabled']));
       allow delete: if isOwner(uid) || isAdmin();
+      allow update: if (isOwner(uid) && request.resource.data.get('disabled', false) == resource.data.get('disabled', false))
+        || (isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['disabled']));
     }
 
     // ---------------- Organizers ----------------
@@ -186,6 +196,61 @@ service cloud.firestore {
       match /guests/{guestId} {
         allow read, write: if isSignedIn()
           && get(/databases/$(database)/documents/ecards/$(ecardId)).data.organizer_id == request.auth.uid;
+      }
+    }
+
+    // ---------------- E-Card Requests (admin approval to create an E-Card) ----------------
+    match /ecard_requests/{requestId} {
+      allow read: if isSignedIn() &&
+        (resource.data.organizer_id == request.auth.uid || isAdmin());
+
+      allow create: if isSignedIn() &&
+        request.resource.data.organizer_id == request.auth.uid &&
+        request.resource.data.status == 'pending';
+
+      allow update: if isAdmin() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'admin_reply', 'resolved_at']);
+
+      allow delete: if false;
+    }
+
+    // ---------------- Messages (admin <-> musician/organizer) ----------------
+    // One thread per user, doc id == their own uid, same pattern as
+    // users/musicians/organizers themselves. Any admin may read/reply
+    // to any thread (not assigned per-admin), matching how every
+    // other admin-moderated collection in this file works.
+    match /message_threads/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      // Either party can create/update the thread summary doc — the
+      // first message from either side establishes it, and every
+      // subsequent message updates last_message/unread flags. The
+      // actual message content lives in the subcollection below,
+      // this doc is only ever a summary/preview.
+      allow create, update: if isOwner(uid) || isAdmin();
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        allow read: if isOwner(uid) || isAdmin();
+
+        // A message's sender_id must be the actual caller, and
+        // sender_role must truthfully reflect which side they're on
+        // — a user can't post a message tagged as if it came from
+        // admin, and vice versa.
+        allow create: if (isOwner(uid)
+              && request.resource.data.sender_id == request.auth.uid
+              && request.resource.data.sender_role == 'user')
+          || (isAdmin()
+              && request.resource.data.sender_id == request.auth.uid
+              && request.resource.data.sender_role == 'admin');
+
+        // Only admin can ever touch a message after it's sent, and
+        // only to toggle `liked` — the "reply or like" interaction
+        // from the spec. Nobody can edit message text after sending,
+        // on either side.
+        allow update: if isAdmin() &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['liked']);
+
+        allow delete: if false;
       }
     }
 

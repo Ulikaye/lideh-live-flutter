@@ -524,10 +524,14 @@ class _ApprovalGateStepState extends ConsumerState<_ApprovalGateStep> {
     try {
       await ref.read(firestoreServiceProvider).createEcardRequest(
           organizerId: widget.organizerId, eventId: widget.eventId);
-      // No manual navigation needed — CreateEcardScreen._buildStep is
-      // watching this exact (organizerId, eventId) request live, so it
-      // swaps to _ApprovalPendingStep on its own the moment this new
-      // document appears.
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Could not send request: $e'),
+              backgroundColor: AppColors.danger),
+        );
+      }
     } finally {
       if (mounted) setState(() => _sending = false);
     }
