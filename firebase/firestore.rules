@@ -209,7 +209,7 @@ service cloud.firestore {
         request.resource.data.status == 'pending';
 
       allow update: if isAdmin() &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'admin_reply', 'resolved_at']);
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'admin_reply', 'resolved_at', 'resolved_by']);
 
       allow delete: if false;
     }

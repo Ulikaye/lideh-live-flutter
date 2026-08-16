@@ -14,30 +14,57 @@ import '../../shared/widgets/loading_indicator.dart';
 /// create_ecard_screen.dart's approval gate). Reachable only by an
 /// admin — the underlying watchAllEcardRequestsForAdmin() query
 /// requires isAdmin() server-side regardless of route guards.
-class AdminEcardRequestsScreen extends ConsumerWidget {
+///
+/// Only pending requests are shown by default — once resolved, a
+/// request clears out of the working queue rather than sitting there
+/// permanently mixed in with ones still needing a decision. Resolved
+/// history is still one tap away, not deleted.
+class AdminEcardRequestsScreen extends ConsumerStatefulWidget {
   const AdminEcardRequestsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AdminEcardRequestsScreen> createState() => _AdminEcardRequestsScreenState();
+}
+
+class _AdminEcardRequestsScreenState extends ConsumerState<AdminEcardRequestsScreen> {
+  bool _showResolved = false;
+
+  @override
+  Widget build(BuildContext context) {
     final requestsAsync = ref.watch(allEcardRequestsForAdminProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('E-Card Requests')),
+      appBar: AppBar(
+        title: const Text('E-Card Requests'),
+        actions: [
+          TextButton.icon(
+            onPressed: () => setState(() => _showResolved = !_showResolved),
+            icon: Icon(_showResolved ? Icons.visibility_off_outlined : Icons.history_outlined),
+            label: Text(_showResolved ? 'Hide resolved' : 'View resolved'),
+          ),
+        ],
+      ),
       body: requestsAsync.when(
         loading: () => const LoadingIndicator(),
         error: (e, _) => AppErrorWidget(message: 'Could not load requests'),
         data: (requests) {
-          if (requests.isEmpty) {
-            return const EmptyStateWidget(title: 'No requests yet', icon: Icons.verified_user_outlined);
+          final visible = _showResolved ? requests : requests.where((r) => r.isPending).toList();
+
+          if (visible.isEmpty) {
+            return EmptyStateWidget(
+              title: _showResolved ? 'No requests yet' : 'No pending requests',
+              subtitle: _showResolved ? null : 'All caught up — resolved requests are hidden by default',
+              icon: Icons.verified_user_outlined,
+            );
           }
           return Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 800),
               child: ListView.separated(
                 padding: const EdgeInsets.all(16),
-                itemCount: requests.length,
+                itemCount: visible.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 8),
-                itemBuilder: (context, i) => _RequestCard(request: requests[i]),
+                itemBuilder: (context, i) => _RequestCard(request: visible[i]),
               ),
             ),
           );
@@ -154,6 +181,16 @@ class _ResolveRowState extends ConsumerState<_ResolveRow> {
             reply: _replyController.text.trim().isEmpty ? null : _replyController.text.trim(),
             adminUid: adminUid,
           );
+    } catch (e) {
+      // Previously uncaught — a rules rejection (or any other write
+      // failure) would flash the optimistic local update and then
+      // silently revert with zero explanation once Firestore's actual
+      // response came back.
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not resolve request: $e'), backgroundColor: AppColors.danger),
+        );
+      }
     } finally {
       if (mounted) setState(() => _resolving = false);
     }
