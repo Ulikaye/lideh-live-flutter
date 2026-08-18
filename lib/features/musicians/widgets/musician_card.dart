@@ -4,6 +4,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../models/musician.dart';
 import '../../../shared/widgets/pressable_scale.dart';
 import '../../../shared/widgets/star_rating.dart';
+import '../../../shared/widgets/verified_badge.dart';
 
 class MusicianCard extends StatelessWidget {
   final Musician musician;
@@ -36,7 +37,22 @@ class MusicianCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(musician.stageName, style: Theme.of(context).textTheme.titleMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(musician.stageName, style: Theme.of(context).textTheme.titleMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
+                            ),
+                            // Always true here in practice — the
+                            // directory query already filters to only
+                            // verified musicians — but shown
+                            // explicitly rather than assumed, so the
+                            // trust signal is visible, not implied.
+                            if (musician.verified) ...[
+                              const SizedBox(width: 4),
+                              const VerifiedBadge(size: 15),
+                            ],
+                          ],
+                        ),
                         if (musician.location != null)
                           Row(
                             children: [

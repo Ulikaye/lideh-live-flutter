@@ -78,33 +78,55 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.user_type == 'admin';
     }
 
+    // Checks the caller's own users/{uid} doc for verified == true.
+    // Used to gate event creation to verified organizers only (see
+    // events/{eventId} create rule below).
+    function isVerifiedOrganizer() {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('verified', false) == true;
+    }
+
     // ---------------- Users ----------------
     match /users/{uid} {
       allow read: if isSignedIn();
-      allow create: if isOwner(uid);
+      allow create: if isOwner(uid)
+        // A new account can never register itself as already verified
+        // or disabled — both must start false, only an admin action
+        // can change them afterward. Without this, someone calling
+        // Firestore directly (bypassing the app's own UI, which never
+        // sends true here) could self-verify right at signup.
+        && request.resource.data.get('verified', false) == false
+        && request.resource.data.get('disabled', false) == false;
       allow update: if (isOwner(uid)
           // user_type is set once at registration and never changed by
           // the client afterwards, to keep role-specific data consistent.
           && request.resource.data.user_type == resource.data.user_type
           // The owner can change anything about their own profile
-          // except `disabled` — only an admin may flip that (below).
-          // .get(field, default) avoids throwing on accounts that have
-          // never been deactivated and so have no `disabled` field yet.
-          && request.resource.data.get('disabled', false) == resource.data.get('disabled', false))
+          // except disabled/verified — only an admin may flip those.
+          // Locking verified here is the actual enforcement of the
+          // approval gate: without this, a user could just write
+          // verified: true to their own document directly and skip
+          // admin review entirely.
+          && request.resource.data.get('disabled', false) == resource.data.get('disabled', false)
+          && request.resource.data.get('verified', false) == resource.data.get('verified', false))
         || (isAdmin()
-          // Admin's only allowed write here is the disabled flag —
+          // Admin's only allowed writes here are disabled/verified —
           // nothing else about another user's profile, ever.
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['disabled']));
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['disabled', 'verified']));
       allow delete: if isOwner(uid) || isAdmin();
     }
 
     // ---------------- Musicians ----------------
     match /musicians/{uid} {
       allow read: if true; // public directory — the browse query itself filters out disabled == true
-      allow create: if isOwner(uid);
+      allow create: if isOwner(uid)
+        && request.resource.data.get('verified', false) == false
+        && request.resource.data.get('disabled', false) == false;
       allow delete: if isOwner(uid) || isAdmin();
-      allow update: if (isOwner(uid) && request.resource.data.get('disabled', false) == resource.data.get('disabled', false))
-        || (isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['disabled']));
+      allow update: if (isOwner(uid)
+          && request.resource.data.get('disabled', false) == resource.data.get('disabled', false)
+          && request.resource.data.get('verified', false) == resource.data.get('verified', false))
+        || (isAdmin() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['disabled', 'verified']));
     }
 
     // ---------------- Organizers ----------------
@@ -156,7 +178,12 @@ service cloud.firestore {
     match /events/{eventId} {
       allow read: if true; // public listing
 
-      allow create: if isSignedIn() && request.resource.data.organizer_id == request.auth.uid;
+      allow create: if isSignedIn()
+        && request.resource.data.organizer_id == request.auth.uid
+        // Account-level approval gate: an organizer can log in and
+        // see their dashboard while unverified, but cannot publish
+        // events until an admin approves the account.
+        && isVerifiedOrganizer();
 
       allow update: if isSignedIn() && (resource.data.organizer_id == request.auth.uid || isAdmin());
 

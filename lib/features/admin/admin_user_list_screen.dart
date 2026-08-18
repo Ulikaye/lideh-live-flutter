@@ -7,6 +7,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/ecard_provider.dart';
 import '../../shared/widgets/error_widget.dart';
 import '../../shared/widgets/loading_indicator.dart';
+import '../../shared/widgets/verified_badge.dart';
 
 /// Admin account moderation — every registered musician/organizer
 /// (and other admins, shown but not actionable against — see
@@ -78,7 +79,20 @@ class AdminUserListScreen extends ConsumerWidget {
                             ? Icon(Icons.person_outline, color: user.disabled ? AppColors.danger : AppColors.primary)
                             : null,
                       ),
-                      title: Text(user.displayName ?? user.email),
+                      title: Row(
+                        children: [
+                          Flexible(child: Text(user.displayName ?? user.email)),
+                          // Positive confirmation, not just the
+                          // absence of "Pending verification" below —
+                          // an admin scanning this list should be
+                          // able to tell at a glance who's already
+                          // cleared, not just who's waiting.
+                          if (_canModerate(user) && user.verified) ...[
+                            const SizedBox(width: 6),
+                            const VerifiedBadge(size: 15),
+                          ],
+                        ],
+                      ),
                       subtitle: Text(
                         '${_roleLabel(user.userType)} · ${user.email}'
                         '${user.disabled ? " · Deactivated" : ""}'

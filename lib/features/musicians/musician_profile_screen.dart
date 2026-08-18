@@ -12,6 +12,7 @@ import '../../providers/musician_provider.dart';
 import '../../shared/widgets/error_widget.dart';
 import '../../shared/widgets/loading_indicator.dart';
 import '../../shared/widgets/star_rating.dart';
+import '../../shared/widgets/verified_badge.dart';
 
 class MusicianProfileScreen extends ConsumerWidget {
   final String musicianId;
@@ -84,7 +85,17 @@ class _ProfileHeader extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(musician.stageName, style: Theme.of(context).textTheme.headlineSmall),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(musician.stageName, style: Theme.of(context).textTheme.headlineSmall, overflow: TextOverflow.ellipsis),
+                      ),
+                      if (musician.verified) ...[
+                        const SizedBox(width: 6),
+                        const VerifiedBadge(size: 20),
+                      ],
+                    ],
+                  ),
                   if (musician.location != null)
                     Text(musician.location!, style: const TextStyle(color: AppColors.textSecondary)),
                   const SizedBox(height: 6),

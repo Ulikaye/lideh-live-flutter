@@ -12,6 +12,7 @@ import '../../shared/widgets/loading_indicator.dart';
 import '../../shared/widgets/notification_bell_button.dart';
 import '../../shared/widgets/profile_menu_button.dart';
 import '../../shared/widgets/star_rating.dart';
+import '../../shared/widgets/verified_badge.dart';
 import '../bookings/widgets/booking_card.dart';
 
 /// Musician's operational home base: everything needed to manage
@@ -116,7 +117,17 @@ class _MusicianDetailsSummaryCard extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(musician.stageName, style: Theme.of(context).textTheme.titleMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(musician.stageName, style: Theme.of(context).textTheme.titleMedium, maxLines: 1, overflow: TextOverflow.ellipsis),
+                          ),
+                          if (musician.verified) ...[
+                            const SizedBox(width: 4),
+                            const VerifiedBadge(size: 14),
+                          ],
+                        ],
+                      ),
                       const SizedBox(height: 4),
                       StarRatingDisplay(rating: musician.avgRating, reviewCount: musician.reviewCount, size: 13),
                       const SizedBox(height: 4),
@@ -127,10 +138,30 @@ class _MusicianDetailsSummaryCard extends ConsumerWidget {
                     ],
                   ),
                 ),
-                OutlinedButton.icon(
-                  onPressed: () => context.go('/musician-details/edit'),
-                  icon: const Icon(Icons.edit_outlined, size: 16),
-                  label: const Text('Edit'),
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: () => context.go('/musician-details/edit'),
+                      icon: const Icon(Icons.edit_outlined, size: 16),
+                      label: const Text('Edit'),
+                    ),
+                    const SizedBox(height: 6),
+                    // The public profile page is where the actual
+                    // written reviews live — the star summary above
+                    // is just an aggregate, this is the convenient
+                    // way for a musician to go read what organizers
+                    // actually said about them, without needing to
+                    // know the direct URL. Shown regardless of
+                    // verified status — the page itself is reachable
+                    // by direct link either way, it's only the
+                    // discovery *listing* that filters on verified.
+                    TextButton(
+                      onPressed: () => context.go('/musicians/${musician.uid}'),
+                      child: const Text('View my public profile', style: TextStyle(fontSize: 12)),
+                    ),
+                  ],
                 ),
               ],
             ),
