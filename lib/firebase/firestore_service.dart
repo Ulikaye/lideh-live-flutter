@@ -23,7 +23,8 @@ import '../models/message_thread.dart';
 class FirestoreService {
   final FirebaseFirestore _db;
 
-  FirestoreService({FirebaseFirestore? db}) : _db = db ?? FirebaseFirestore.instance;
+  FirestoreService({FirebaseFirestore? db})
+      : _db = db ?? FirebaseFirestore.instance;
 
   // ---------------- Users ----------------
   Future<UserProfile?> getUser(String uid) async {
@@ -53,7 +54,8 @@ class FirestoreService {
         .orderBy('created_at', descending: true)
         .limit(limit)
         .snapshots()
-        .map((snap) => snap.docs.map((d) => UserProfile.fromMap(d.id, d.data())).toList());
+        .map((snap) =>
+            snap.docs.map((d) => UserProfile.fromMap(d.id, d.data())).toList());
   }
 
   /// Toggles account access. Reversible — this is the everyday
@@ -61,11 +63,14 @@ class FirestoreService {
   /// batch) when the account is a musician, since the public
   /// directory query filters on that collection's own `disabled`
   /// field, not users/.
-  Future<void> setUserDisabled(String uid, bool disabled, {required UserType userType}) async {
+  Future<void> setUserDisabled(String uid, bool disabled,
+      {required UserType userType}) async {
     final batch = _db.batch();
-    batch.update(_db.collection(AppStrings.usersCollection).doc(uid), {'disabled': disabled});
+    batch.update(_db.collection(AppStrings.usersCollection).doc(uid),
+        {'disabled': disabled});
     if (userType == UserType.musician) {
-      batch.update(_db.collection(AppStrings.musiciansCollection).doc(uid), {'disabled': disabled});
+      batch.update(_db.collection(AppStrings.musiciansCollection).doc(uid),
+          {'disabled': disabled});
     }
     await batch.commit();
   }
@@ -77,11 +82,14 @@ class FirestoreService {
   /// setUserDisabled's exact batch-write shape — same two-collection
   /// sync requirement, same reason (the public/gated query needs the
   /// field on the document it's actually querying, not a join).
-  Future<void> setUserVerified(String uid, bool verified, {required UserType userType}) async {
+  Future<void> setUserVerified(String uid, bool verified,
+      {required UserType userType}) async {
     final batch = _db.batch();
-    batch.update(_db.collection(AppStrings.usersCollection).doc(uid), {'verified': verified});
+    batch.update(_db.collection(AppStrings.usersCollection).doc(uid),
+        {'verified': verified});
     if (userType == UserType.musician) {
-      batch.update(_db.collection(AppStrings.musiciansCollection).doc(uid), {'verified': verified});
+      batch.update(_db.collection(AppStrings.musiciansCollection).doc(uid),
+          {'verified': verified});
     }
     await batch.commit();
   }
@@ -94,7 +102,8 @@ class FirestoreService {
   /// listed anywhere, every screen that reads their profile gets
   /// null) even though the bare login technically still exists until
   /// that Cloud Function is deployed.
-  Future<void> deleteUserAccount(String uid, {required UserType userType}) async {
+  Future<void> deleteUserAccount(String uid,
+      {required UserType userType}) async {
     final batch = _db.batch();
     batch.delete(_db.collection(AppStrings.usersCollection).doc(uid));
     if (userType == UserType.musician) {
@@ -107,16 +116,23 @@ class FirestoreService {
 
   // ---------------- Musicians ----------------
   Future<void> setMusicianProfile(Musician musician) {
-    return _db.collection(AppStrings.musiciansCollection).doc(musician.uid).set(musician.toMap(), SetOptions(merge: true));
+    return _db
+        .collection(AppStrings.musiciansCollection)
+        .doc(musician.uid)
+        .set(musician.toMap(), SetOptions(merge: true));
   }
 
   Stream<Musician?> watchMusician(String uid) {
-    return _db.collection(AppStrings.musiciansCollection).doc(uid).snapshots().map(
-        (doc) => doc.exists ? Musician.fromMap(uid, doc.data()!) : null);
+    return _db
+        .collection(AppStrings.musiciansCollection)
+        .doc(uid)
+        .snapshots()
+        .map((doc) => doc.exists ? Musician.fromMap(uid, doc.data()!) : null);
   }
 
   Future<Musician?> getMusician(String uid) async {
-    final doc = await _db.collection(AppStrings.musiciansCollection).doc(uid).get();
+    final doc =
+        await _db.collection(AppStrings.musiciansCollection).doc(uid).get();
     if (!doc.exists) return null;
     return Musician.fromMap(uid, doc.data()!);
   }
@@ -127,13 +143,17 @@ class FirestoreService {
   /// then any free-text refinement happens client-side on the (small)
   /// result page — this keeps reads bounded instead of scanning
   /// everything.
-  Stream<List<Musician>> watchMusicians({String? location, String? skill, int limit = 50}) {
-    Query<Map<String, dynamic>> query = _db.collection(AppStrings.musiciansCollection);
+  Stream<List<Musician>> watchMusicians(
+      {String? location, String? skill, int limit = 50}) {
+    Query<Map<String, dynamic>> query =
+        _db.collection(AppStrings.musiciansCollection);
     if (skill != null && skill.isNotEmpty) {
       query = query.where('skills', arrayContains: skill);
     }
     if (location != null && location.isNotEmpty) {
-      query = query.orderBy('location').startAt([location]).endAt(['$location\uf8ff']);
+      query = query
+          .orderBy('location')
+          .startAt([location]).endAt(['$location\uf8ff']);
     } else {
       query = query.orderBy('joined_at', descending: true);
     }
@@ -165,28 +185,41 @@ class FirestoreService {
         .map((snap) => snap.docs
             .map((d) => Musician.fromMap(d.id, d.data()))
             .where((m) => !m.disabled)
+            .where((m) => m.verified) // ✅ FIX: filter out unverified musicians
             .toList());
   }
 
   // ---------------- Organizers ----------------
   Future<void> setOrganizerProfile(Organizer organizer) {
-    return _db.collection(AppStrings.organizersCollection).doc(organizer.uid).set(organizer.toMap(), SetOptions(merge: true));
+    return _db
+        .collection(AppStrings.organizersCollection)
+        .doc(organizer.uid)
+        .set(organizer.toMap(), SetOptions(merge: true));
   }
 
   Stream<Organizer?> watchOrganizer(String uid) {
-    return _db.collection(AppStrings.organizersCollection).doc(uid).snapshots().map(
-        (doc) => doc.exists ? Organizer.fromMap(uid, doc.data()!) : null);
+    return _db
+        .collection(AppStrings.organizersCollection)
+        .doc(uid)
+        .snapshots()
+        .map((doc) => doc.exists ? Organizer.fromMap(uid, doc.data()!) : null);
   }
 
   // ---------------- Skills ----------------
   Stream<List<Skill>> watchSkills() {
-    return _db.collection(AppStrings.skillsCollection).orderBy('name').snapshots().map(
-        (snap) => snap.docs.map((d) => Skill.fromMap(d.id, d.data())).toList());
+    return _db
+        .collection(AppStrings.skillsCollection)
+        .orderBy('name')
+        .snapshots()
+        .map((snap) =>
+            snap.docs.map((d) => Skill.fromMap(d.id, d.data())).toList());
   }
 
   // ---------------- Bookings ----------------
   Future<String> createBooking(Booking booking) async {
-    final ref = await _db.collection(AppStrings.bookingsCollection).add(booking.toMap());
+    final ref = await _db
+        .collection(AppStrings.bookingsCollection)
+        .add(booking.toMap());
     return ref.id;
   }
 
@@ -198,8 +231,11 @@ class FirestoreService {
   }
 
   Stream<Booking?> watchBooking(String id) {
-    return _db.collection(AppStrings.bookingsCollection).doc(id).snapshots().map(
-        (doc) => doc.exists ? Booking.fromMap(id, doc.data()!) : null);
+    return _db
+        .collection(AppStrings.bookingsCollection)
+        .doc(id)
+        .snapshots()
+        .map((doc) => doc.exists ? Booking.fromMap(id, doc.data()!) : null);
   }
 
   Stream<List<Booking>> watchBookingsForMusician(String musicianId) {
@@ -208,7 +244,8 @@ class FirestoreService {
         .where('musician_id', isEqualTo: musicianId)
         .orderBy('event_date', descending: true)
         .snapshots()
-        .map((snap) => snap.docs.map((d) => Booking.fromMap(d.id, d.data())).toList());
+        .map((snap) =>
+            snap.docs.map((d) => Booking.fromMap(d.id, d.data())).toList());
   }
 
   Stream<List<Booking>> watchBookingsForOrganizer(String organizerId) {
@@ -217,15 +254,18 @@ class FirestoreService {
         .where('organizer_id', isEqualTo: organizerId)
         .orderBy('event_date', descending: true)
         .snapshots()
-        .map((snap) => snap.docs.map((d) => Booking.fromMap(d.id, d.data())).toList());
+        .map((snap) =>
+            snap.docs.map((d) => Booking.fromMap(d.id, d.data())).toList());
   }
 
   // ---------------- Reviews ----------------
   Future<void> submitReview(Review review) async {
     final batch = _db.batch();
-    final reviewRef = _db.collection(AppStrings.reviewsCollection).doc(review.bookingId);
+    final reviewRef =
+        _db.collection(AppStrings.reviewsCollection).doc(review.bookingId);
     batch.set(reviewRef, review.toMap());
-    final bookingRef = _db.collection(AppStrings.bookingsCollection).doc(review.bookingId);
+    final bookingRef =
+        _db.collection(AppStrings.bookingsCollection).doc(review.bookingId);
     batch.update(bookingRef, {'review_submitted': true});
     await batch.commit();
     // Recompute the musician's aggregate rating from all their reviews.
@@ -233,11 +273,18 @@ class FirestoreService {
   }
 
   Future<void> _recomputeMusicianRating(String musicianId) async {
-    final snap = await _db.collection(AppStrings.reviewsCollection).where('musician_id', isEqualTo: musicianId).get();
+    final snap = await _db
+        .collection(AppStrings.reviewsCollection)
+        .where('musician_id', isEqualTo: musicianId)
+        .get();
     if (snap.docs.isEmpty) return;
-    final ratings = snap.docs.map((d) => (d.data()['rating'] as num).toDouble());
+    final ratings =
+        snap.docs.map((d) => (d.data()['rating'] as num).toDouble());
     final avg = ratings.reduce((a, b) => a + b) / ratings.length;
-    await _db.collection(AppStrings.musiciansCollection).doc(musicianId).update({
+    await _db
+        .collection(AppStrings.musiciansCollection)
+        .doc(musicianId)
+        .update({
       'avg_rating': avg,
       'review_count': snap.docs.length,
     });
@@ -249,12 +296,14 @@ class FirestoreService {
         .where('musician_id', isEqualTo: musicianId)
         .orderBy('created_at', descending: true)
         .snapshots()
-        .map((snap) => snap.docs.map((d) => Review.fromMap(d.id, d.data())).toList());
+        .map((snap) =>
+            snap.docs.map((d) => Review.fromMap(d.id, d.data())).toList());
   }
 
   // ---------------- Events ----------------
   Future<String> createEvent(Event event) async {
-    final ref = await _db.collection(AppStrings.eventsCollection).add(event.toMap());
+    final ref =
+        await _db.collection(AppStrings.eventsCollection).add(event.toMap());
     return ref.id;
   }
 
@@ -281,8 +330,11 @@ class FirestoreService {
   }
 
   Stream<Event?> watchEvent(String id) {
-    return _db.collection(AppStrings.eventsCollection).doc(id).snapshots().map(
-        (doc) => doc.exists ? Event.fromMap(id, doc.data()!) : null);
+    return _db
+        .collection(AppStrings.eventsCollection)
+        .doc(id)
+        .snapshots()
+        .map((doc) => doc.exists ? Event.fromMap(id, doc.data()!) : null);
   }
 
   Stream<List<Event>> watchEventsForOrganizer(String organizerId) {
@@ -291,7 +343,8 @@ class FirestoreService {
         .where('organizer_id', isEqualTo: organizerId)
         .orderBy('date', descending: true)
         .snapshots()
-        .map((snap) => snap.docs.map((d) => Event.fromMap(d.id, d.data())).toList());
+        .map((snap) =>
+            snap.docs.map((d) => Event.fromMap(d.id, d.data())).toList());
   }
 
   /// Toggles an event's visibility in the public listing. Reuses the
@@ -302,7 +355,10 @@ class FirestoreService {
   /// Available to the organizer on their own event, or to an admin
   /// moderating any event (see the matching rule in firestore.rules).
   Future<void> setEventCancelled(String eventId, bool cancelled) {
-    return _db.collection(AppStrings.eventsCollection).doc(eventId).update({'is_cancelled': cancelled});
+    return _db
+        .collection(AppStrings.eventsCollection)
+        .doc(eventId)
+        .update({'is_cancelled': cancelled});
   }
 
   Future<void> deleteEvent(String eventId) {
@@ -319,11 +375,15 @@ class FirestoreService {
         .orderBy('date', descending: true)
         .limit(limit)
         .snapshots()
-        .map((snap) => snap.docs.map((d) => Event.fromMap(d.id, d.data())).toList());
+        .map((snap) =>
+            snap.docs.map((d) => Event.fromMap(d.id, d.data())).toList());
   }
 
   Future<void> updateEventPublished(String eventId, bool isPublished) {
-    return _db.collection(AppStrings.eventsCollection).doc(eventId).update({'is_published': isPublished});
+    return _db
+        .collection(AppStrings.eventsCollection)
+        .doc(eventId)
+        .update({'is_published': isPublished});
   }
 
   // ---------------- E-Card Requests ----------------
@@ -334,7 +394,8 @@ class FirestoreService {
   CollectionReference<Map<String, dynamic>> get _ecardRequestsRef =>
       _db.collection(AppStrings.ecardRequestsCollection);
 
-  Future<String> createEcardRequest({required String organizerId, required String eventId}) async {
+  Future<String> createEcardRequest(
+      {required String organizerId, required String eventId}) async {
     final ref = await _ecardRequestsRef.add(
       EcardRequest(id: '', organizerId: organizerId, eventId: eventId).toMap(),
     );
@@ -344,21 +405,27 @@ class FirestoreService {
   /// The latest request for this (organizer, event) pair — a
   /// rejected request can be followed by a new one, so this always
   /// reflects the most recent attempt, not the full history.
-  Stream<EcardRequest?> watchLatestEcardRequestForEvent(String organizerId, String eventId) {
+  Stream<EcardRequest?> watchLatestEcardRequestForEvent(
+      String organizerId, String eventId) {
     return _ecardRequestsRef
         .where('organizer_id', isEqualTo: organizerId)
         .where('event_id', isEqualTo: eventId)
         .orderBy('created_at', descending: true)
         .limit(1)
         .snapshots()
-        .map((snap) => snap.docs.isEmpty ? null : EcardRequest.fromMap(snap.docs.first.id, snap.docs.first.data()));
+        .map((snap) => snap.docs.isEmpty
+            ? null
+            : EcardRequest.fromMap(snap.docs.first.id, snap.docs.first.data()));
   }
 
   /// Admin's live badge count — this is the mechanism that stands in
   /// for a notification here (see EcardRequest's doc comment for why
   /// this isn't using the notifications/ collection).
   Stream<int> watchPendingEcardRequestCount() {
-    return _ecardRequestsRef.where('status', isEqualTo: 'pending').snapshots().map((snap) => snap.docs.length);
+    return _ecardRequestsRef
+        .where('status', isEqualTo: 'pending')
+        .snapshots()
+        .map((snap) => snap.docs.length);
   }
 
   Stream<List<EcardRequest>> watchAllEcardRequestsForAdmin({int limit = 200}) {
@@ -366,7 +433,9 @@ class FirestoreService {
         .orderBy('created_at', descending: true)
         .limit(limit)
         .snapshots()
-        .map((snap) => snap.docs.map((d) => EcardRequest.fromMap(d.id, d.data())).toList());
+        .map((snap) => snap.docs
+            .map((d) => EcardRequest.fromMap(d.id, d.data()))
+            .toList());
   }
 
   Future<void> resolveEcardRequest(
@@ -385,8 +454,13 @@ class FirestoreService {
 
   // ---------------- Blog ----------------
   Stream<List<BlogCategory>> watchBlogCategories() {
-    return _db.collection(AppStrings.blogCategoriesCollection).orderBy('name').snapshots().map(
-        (snap) => snap.docs.map((d) => BlogCategory.fromMap(d.id, d.data())).toList());
+    return _db
+        .collection(AppStrings.blogCategoriesCollection)
+        .orderBy('name')
+        .snapshots()
+        .map((snap) => snap.docs
+            .map((d) => BlogCategory.fromMap(d.id, d.data()))
+            .toList());
   }
 
   Stream<List<BlogPost>> watchBlogPosts({String? categoryId, int limit = 30}) {
@@ -396,13 +470,20 @@ class FirestoreService {
     if (categoryId != null) {
       query = query.where('category_id', isEqualTo: categoryId);
     }
-    return query.orderBy('published_date', descending: true).limit(limit).snapshots().map(
-        (snap) => snap.docs.map((d) => BlogPost.fromMap(d.id, d.data())).toList());
+    return query
+        .orderBy('published_date', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map((snap) =>
+            snap.docs.map((d) => BlogPost.fromMap(d.id, d.data())).toList());
   }
 
   Stream<BlogPost?> watchBlogPost(String id) {
-    return _db.collection(AppStrings.blogPostsCollection).doc(id).snapshots().map(
-        (doc) => doc.exists ? BlogPost.fromMap(id, doc.data()!) : null);
+    return _db
+        .collection(AppStrings.blogPostsCollection)
+        .doc(id)
+        .snapshots()
+        .map((doc) => doc.exists ? BlogPost.fromMap(id, doc.data()!) : null);
   }
 
   // ---------------- Blog admin ----------------
@@ -415,16 +496,21 @@ class FirestoreService {
         .orderBy('published_date', descending: true)
         .limit(limit)
         .snapshots()
-        .map((snap) => snap.docs.map((d) => BlogPost.fromMap(d.id, d.data())).toList());
+        .map((snap) =>
+            snap.docs.map((d) => BlogPost.fromMap(d.id, d.data())).toList());
   }
 
   Future<String> createBlogPost(BlogPost post) async {
-    final ref = await _db.collection(AppStrings.blogPostsCollection).add(post.toMap());
+    final ref =
+        await _db.collection(AppStrings.blogPostsCollection).add(post.toMap());
     return ref.id;
   }
 
   Future<void> setBlogPost(String id, BlogPost post) {
-    return _db.collection(AppStrings.blogPostsCollection).doc(id).set(post.toMap());
+    return _db
+        .collection(AppStrings.blogPostsCollection)
+        .doc(id)
+        .set(post.toMap());
   }
 
   Future<void> deleteBlogPost(String id) {
@@ -445,13 +531,17 @@ class FirestoreService {
   }
 
   Future<String> createEcard(Ecard ecard) async {
-    final ref = await _db.collection(AppStrings.ecardsCollection).add(ecard.toMap());
+    final ref =
+        await _db.collection(AppStrings.ecardsCollection).add(ecard.toMap());
     return ref.id;
   }
 
   Stream<Ecard?> watchEcard(String id) {
-    return _db.collection(AppStrings.ecardsCollection).doc(id).snapshots().map(
-        (doc) => doc.exists ? Ecard.fromMap(id, doc.data()!) : null);
+    return _db
+        .collection(AppStrings.ecardsCollection)
+        .doc(id)
+        .snapshots()
+        .map((doc) => doc.exists ? Ecard.fromMap(id, doc.data()!) : null);
   }
 
   Stream<List<Ecard>> watchEcardsForOrganizer(String organizerId) {
@@ -460,7 +550,8 @@ class FirestoreService {
         .where('organizer_id', isEqualTo: organizerId)
         .orderBy('created_at', descending: true)
         .snapshots()
-        .map((snap) => snap.docs.map((d) => Ecard.fromMap(d.id, d.data())).toList());
+        .map((snap) =>
+            snap.docs.map((d) => Ecard.fromMap(d.id, d.data())).toList());
   }
 
   /// One E-Card per event is the expected UI flow (see the "Create an
@@ -483,7 +574,9 @@ class FirestoreService {
         .where('organizer_id', isEqualTo: organizerId)
         .limit(1)
         .snapshots()
-        .map((snap) => snap.docs.isEmpty ? null : Ecard.fromMap(snap.docs.first.id, snap.docs.first.data()));
+        .map((snap) => snap.docs.isEmpty
+            ? null
+            : Ecard.fromMap(snap.docs.first.id, snap.docs.first.data()));
   }
 
   Future<void> updateEcardFields(String ecardId, Map<String, dynamic> fields) {
@@ -515,7 +608,8 @@ class FirestoreService {
         .orderBy('created_at', descending: true)
         .limit(limit)
         .snapshots()
-        .map((snap) => snap.docs.map((d) => Ecard.fromMap(d.id, d.data())).toList());
+        .map((snap) =>
+            snap.docs.map((d) => Ecard.fromMap(d.id, d.data())).toList());
   }
 
   /// Admin moderation view — every E-Card regardless of owner or
@@ -527,7 +621,8 @@ class FirestoreService {
         .orderBy('created_at', descending: true)
         .limit(limit)
         .snapshots()
-        .map((snap) => snap.docs.map((d) => Ecard.fromMap(d.id, d.data())).toList());
+        .map((snap) =>
+            snap.docs.map((d) => Ecard.fromMap(d.id, d.data())).toList());
   }
 
   Future<void> deleteEcard(String ecardId) {
@@ -542,20 +637,21 @@ class FirestoreService {
   // ---- E-Card templates (admin/seed-managed, public read) ----
 
   Stream<List<EcardTemplate>> watchEcardTemplates({EcardOccasion? occasion}) {
-    Query<Map<String, dynamic>> query =
-        _db.collection(AppStrings.ecardTemplatesCollection).where('is_active', isEqualTo: true);
+    Query<Map<String, dynamic>> query = _db
+        .collection(AppStrings.ecardTemplatesCollection)
+        .where('is_active', isEqualTo: true);
     if (occasion != null) {
       query = query.where('occasion', isEqualTo: occasion.value);
     }
-    return query.snapshots().map(
-        (snap) => snap.docs.map((d) => EcardTemplate.fromMap(d.id, d.data())).toList());
+    return query.snapshots().map((snap) =>
+        snap.docs.map((d) => EcardTemplate.fromMap(d.id, d.data())).toList());
   }
 
   // ---- E-Card guests ----
 
   Stream<List<EcardGuest>> watchGuestsForEcard(String ecardId) {
-    return _guestsRef(ecardId).orderBy('created_at').snapshots().map(
-        (snap) => snap.docs.map((d) => EcardGuest.fromMap(d.id, d.data())).toList());
+    return _guestsRef(ecardId).orderBy('created_at').snapshots().map((snap) =>
+        snap.docs.map((d) => EcardGuest.fromMap(d.id, d.data())).toList());
   }
 
   /// Single-guest watch for the guest card/QR view (Phase 6) — avoids
@@ -584,9 +680,11 @@ class FirestoreService {
 
     return _db.runTransaction((tx) async {
       final ecardSnap = await tx.get(ecardRef);
-      final current = (ecardSnap.data()?['guest_counter'] as num?)?.toInt() ?? 0;
+      final current =
+          (ecardSnap.data()?['guest_counter'] as num?)?.toInt() ?? 0;
       final next = current + 1;
-      final displayId = '${occasion.guestIdPrefix}-${next.toString().padLeft(4, '0')}';
+      final displayId =
+          '${occasion.guestIdPrefix}-${next.toString().padLeft(4, '0')}';
 
       final guest = EcardGuest(
         id: guestRef.id,
@@ -596,13 +694,15 @@ class FirestoreService {
         category: category,
       );
 
-      tx.update(ecardRef, {'guest_counter': next, 'updated_at': FieldValue.serverTimestamp()});
+      tx.update(ecardRef,
+          {'guest_counter': next, 'updated_at': FieldValue.serverTimestamp()});
       tx.set(guestRef, guest.toMap());
       return guest;
     });
   }
 
-  Future<void> updateEcardGuest(String ecardId, String guestId, Map<String, dynamic> data) {
+  Future<void> updateEcardGuest(
+      String ecardId, String guestId, Map<String, dynamic> data) {
     return _guestsRef(ecardId).doc(guestId).update(data);
   }
 
@@ -642,8 +742,12 @@ class FirestoreService {
   // rules-vs-query mismatch we've fixed elsewhere in this project.
 
   Stream<MessageThread?> watchMessageThread(String uid) {
-    return _db.collection(AppStrings.messageThreadsCollection).doc(uid).snapshots().map(
-        (doc) => doc.exists ? MessageThread.fromMap(uid, doc.data()!) : null);
+    return _db
+        .collection(AppStrings.messageThreadsCollection)
+        .doc(uid)
+        .snapshots()
+        .map((doc) =>
+            doc.exists ? MessageThread.fromMap(uid, doc.data()!) : null);
   }
 
   Stream<List<ChatMessage>> watchMessagesForThread(String uid) {
@@ -653,7 +757,8 @@ class FirestoreService {
         .collection('messages')
         .orderBy('created_at')
         .snapshots()
-        .map((snap) => snap.docs.map((d) => ChatMessage.fromMap(d.id, d.data())).toList());
+        .map((snap) =>
+            snap.docs.map((d) => ChatMessage.fromMap(d.id, d.data())).toList());
   }
 
   /// Sends a message and updates the parent thread's summary in one
@@ -667,11 +772,16 @@ class FirestoreService {
     required String userDisplayName,
     required String userType,
   }) async {
-    final threadRef = _db.collection(AppStrings.messageThreadsCollection).doc(uid);
+    final threadRef =
+        _db.collection(AppStrings.messageThreadsCollection).doc(uid);
     final messageRef = threadRef.collection('messages').doc();
 
     final batch = _db.batch();
-    batch.set(messageRef, ChatMessage(id: '', senderId: senderId, senderRole: senderRole, text: text).toMap());
+    batch.set(
+        messageRef,
+        ChatMessage(
+                id: '', senderId: senderId, senderRole: senderRole, text: text)
+            .toMap());
     batch.set(
       threadRef,
       MessageThread(
@@ -710,6 +820,8 @@ class FirestoreService {
         .collection(AppStrings.messageThreadsCollection)
         .orderBy('last_message_at', descending: true)
         .snapshots()
-        .map((snap) => snap.docs.map((d) => MessageThread.fromMap(d.id, d.data())).toList());
+        .map((snap) => snap.docs
+            .map((d) => MessageThread.fromMap(d.id, d.data()))
+            .toList());
   }
 }
