@@ -69,8 +69,7 @@ final _publicRoutes = <String>{
 /// dashboards are additionally checked in their own screens.
 bool _isPublic(String path) {
   if (_publicRoutes.contains(path)) return true;
-  if (path.startsWith('/musicians/'))
-    return true; // musician profile pages are public
+  if (path.startsWith('/musicians/')) return true;
   if (path.startsWith('/events/')) return true;
   if (path.startsWith('/blog/')) return true;
   if (path.startsWith('/e-cards/public/')) return true;
@@ -80,12 +79,8 @@ bool _isPublic(String path) {
 final routerProvider = Provider<GoRouter>((ref) {
   final authNotifier = ValueNotifier<bool>(false);
   ref.listen(authStateProvider, (prev, next) {
-    authNotifier.value =
-        !authNotifier.value; // force GoRouter to re-evaluate redirects
+    authNotifier.value = !authNotifier.value;
   });
-  // Also re-evaluate when the profile itself changes — this is what
-  // makes an admin's deactivate action take effect immediately for a
-  // user who's actively using the app, not just on their next login.
   ref.listen(currentUserProfileProvider, (prev, next) {
     authNotifier.value = !authNotifier.value;
   });
@@ -94,24 +89,6 @@ final routerProvider = Provider<GoRouter>((ref) {
     initialLocation: '/',
     refreshListenable: authNotifier,
     redirect: (context, state) {
-      // FirebaseAuth.instance.currentUser rather than
-      // ref.read(authStateProvider).value — deliberately. Right after
-      // registerWithEmail() completes and register_screen.dart calls
-      // context.go('/profile-setup'), the Riverpod-cached stream
-      // value can briefly still reflect the pre-registration
-      // (logged-out) state, since the stream event and the awaited
-      // Future don't resolve on the same tick. That momentary false
-      // "not logged in" read was bouncing brand-new users:
-      // /profile-setup -> (looks logged out) -> /login -> (stream
-      // catches up, /login now looks like an auth page to leave) ->
-      // /. Net effect: every new registration landed on home,
-      // profile-setup was never actually seen, and — for
-      // musicians specifically — musicians/{uid} was never created,
-      // since that write only happens inside profile-setup's submit.
-      // FirebaseAuth's own currentUser getter is updated synchronously
-      // by the SDK the moment sign-in/registration completes, with no
-      // stream-propagation delay, so it's never stale here the way
-      // the stream-derived value briefly can be.
       final isLoggedIn = FirebaseAuth.instance.currentUser != null;
       final path = state.matchedLocation;
 
@@ -132,7 +109,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (path.startsWith('/admin')) {
         final profile = ref.read(currentUserProfileProvider).value;
         if (profile?.userType != UserType.admin) {
-          return '/'; // not an admin, kick them home
+          return '/';
         }
       }
       return null;
@@ -320,9 +297,17 @@ final routerProvider = Provider<GoRouter>((ref) {
           builder: (_, s) =>
               LoginScreen(redirectTo: s.uri.queryParameters['redirect'])),
       GoRoute(path: '/register', builder: (_, __) => const RegisterScreen()),
+      // Modified: pass userType as query parameter
       GoRoute(
-          path: '/profile-setup',
-          builder: (_, __) => const ProfileSetupScreen()),
+        path: '/profile-setup',
+        builder: (_, state) {
+          final userTypeParam = state.uri.queryParameters['userType'];
+          final userType = userTypeParam != null
+              ? UserType.values.firstWhere((e) => e.name == userTypeParam)
+              : UserType.organizer; // fallback
+          return ProfileSetupScreen(userType: userType);
+        },
+      ),
     ],
   );
 });

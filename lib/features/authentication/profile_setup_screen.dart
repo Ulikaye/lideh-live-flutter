@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // ✅ Added for direct Firestore access
 import '../../core/constants/strings.dart';
 import '../../core/utils/validators.dart';
 import '../../models/musician.dart';
@@ -14,7 +16,8 @@ import '../../shared/widgets/loading_indicator.dart';
 /// the user reaches the rest of the app — mirroring the mandatory
 /// "complete your profile" step in the original Django onboarding flow.
 class ProfileSetupScreen extends ConsumerStatefulWidget {
-  const ProfileSetupScreen({super.key});
+  final UserType userType;
+  const ProfileSetupScreen({super.key, required this.userType});
 
   @override
   ConsumerState<ProfileSetupScreen> createState() => _ProfileSetupScreenState();
@@ -38,15 +41,44 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
 
   bool _saving = false;
 
-  Future<void> _submit(UserType userType) async {
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _saving = true);
 
-    final uid = ref.read(authServiceProvider).currentUser!.uid;
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('You must be logged in to set up your profile.')),
+        );
+        context.go('/login');
+      }
+      return;
+    }
+    final uid = user.uid;
     final firestore = ref.read(firestoreServiceProvider);
+    final userType = widget.userType;
 
     try {
+      // ✅ Safety net: create the user document if it's missing
+      // (Uses FirebaseFirestore.instance directly to avoid private access)
+      final userDoc = FirebaseFirestore.instance
+          .collection(AppStrings.usersCollection)
+          .doc(uid);
+      final snap = await userDoc.get();
+      if (!snap.exists) {
+        await userDoc.set({
+          'uid': uid,
+          'email': user.email,
+          'user_type': userType.name,
+          'display_name': user.displayName ?? '',
+          'created_at': FieldValue.serverTimestamp(),
+        });
+        debugPrint('PROFILE SETUP: Created missing user doc for UID: $uid');
+      }
+
       if (userType == UserType.musician) {
         debugPrint('PROFILE SETUP: Creating musician document for UID: $uid');
 
@@ -120,74 +152,62 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final profileAsync = ref.watch(currentUserProfileProvider);
+    final userType = widget.userType;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Complete Your Profile')),
-      body: profileAsync.when(
-        loading: () => const LoadingIndicator(),
-        error: (e, _) => Center(child: Text('Error: $e')),
-        data: (profile) {
-          if (profile == null)
-            return const LoadingIndicator(
-                message: 'Setting up your account...');
-          final userType = profile.userType;
-
-          return Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 560),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        userType == UserType.musician
-                            ? "Tell us about your music"
-                            : 'Tell us about your organization',
-                        style: Theme.of(context).textTheme.headlineSmall,
-                      ),
-                      const SizedBox(height: 20),
-                      if (userType == UserType.musician)
-                        ..._musicianFields()
-                      else
-                        ..._organizerFields(),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _locationController,
-                        decoration: const InputDecoration(
-                            labelText: 'City / Region',
-                            prefixIcon: Icon(Icons.location_on_outlined)),
-                        validator: (v) =>
-                            Validators.required(v, field: 'Location'),
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _bioController,
-                        maxLines: 3,
-                        decoration: const InputDecoration(
-                            labelText: 'Short bio', alignLabelWithHint: true),
-                      ),
-                      const SizedBox(height: 24),
-                      ElevatedButton(
-                        onPressed: _saving ? null : () => _submit(userType),
-                        child: _saving
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                    strokeWidth: 2, color: Colors.white))
-                            : const Text('Finish Setup'),
-                      ),
-                    ],
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 560),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    userType == UserType.musician
+                        ? "Tell us about your music"
+                        : 'Tell us about your organization',
+                    style: Theme.of(context).textTheme.headlineSmall,
                   ),
-                ),
+                  const SizedBox(height: 20),
+                  if (userType == UserType.musician)
+                    ..._musicianFields()
+                  else
+                    ..._organizerFields(),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _locationController,
+                    decoration: const InputDecoration(
+                        labelText: 'City / Region',
+                        prefixIcon: Icon(Icons.location_on_outlined)),
+                    validator: (v) => Validators.required(v, field: 'Location'),
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _bioController,
+                    maxLines: 3,
+                    decoration: const InputDecoration(
+                        labelText: 'Short bio', alignLabelWithHint: true),
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton(
+                    onPressed: _saving ? null : _submit,
+                    child: _saving
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white))
+                        : const Text('Finish Setup'),
+                  ),
+                ],
               ),
             ),
-          );
-        },
+          ),
+        ),
       ),
     );
   }

@@ -38,7 +38,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             userType: _userType,
             displayName: _nameController.text.trim(),
           );
-      if (mounted) context.go('/profile-setup');
+      if (mounted) {
+        // Pass the userType to the profile setup screen
+        context.go('/profile-setup?userType=${_userType.name}');
+      }
     } on FirebaseAuthException catch (e) {
       setState(() => _error = _friendlyAuthError(e.code));
     } finally {
@@ -73,7 +76,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text('I am joining as a...', style: Theme.of(context).textTheme.titleMedium),
+                  Text('I am joining as a...',
+                      style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 12),
                   Row(
                     children: [
@@ -83,7 +87,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           subtitle: 'Book musicians for events',
                           iconName: 'person_double',
                           selected: _userType == UserType.organizer,
-                          onTap: () => setState(() => _userType = UserType.organizer),
+                          onTap: () =>
+                              setState(() => _userType = UserType.organizer),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -93,7 +98,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           subtitle: 'Get booked for events',
                           iconName: 'music',
                           selected: _userType == UserType.musician,
-                          onTap: () => setState(() => _userType = UserType.musician),
+                          onTap: () =>
+                              setState(() => _userType = UserType.musician),
                         ),
                       ),
                     ],
@@ -102,42 +108,58 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   if (_error != null) ...[
                     Container(
                       padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(color: AppColors.danger.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(10)),
-                      child: Text(_error!, style: const TextStyle(color: AppColors.danger)),
+                      decoration: BoxDecoration(
+                          color: AppColors.danger.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(10)),
+                      child: Text(_error!,
+                          style: const TextStyle(color: AppColors.danger)),
                     ),
                     const SizedBox(height: 16),
                   ],
                   TextFormField(
                     controller: _nameController,
-                    decoration: const InputDecoration(labelText: 'Full name / Organization name', prefixIcon: Icon(Icons.person_outline)),
+                    decoration: const InputDecoration(
+                        labelText: 'Full name / Organization name',
+                        prefixIcon: Icon(Icons.person_outline)),
                     validator: (v) => Validators.required(v, field: 'Name'),
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(labelText: 'Email', prefixIcon: Icon(Icons.email_outlined)),
+                    decoration: const InputDecoration(
+                        labelText: 'Email',
+                        prefixIcon: Icon(Icons.email_outlined)),
                     validator: Validators.email,
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _passwordController,
                     obscureText: true,
-                    decoration: const InputDecoration(labelText: 'Password', prefixIcon: Icon(Icons.lock_outline)),
+                    decoration: const InputDecoration(
+                        labelText: 'Password',
+                        prefixIcon: Icon(Icons.lock_outline)),
                     validator: Validators.password,
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: _confirmController,
                     obscureText: true,
-                    decoration: const InputDecoration(labelText: 'Confirm Password', prefixIcon: Icon(Icons.lock_outline)),
-                    validator: (v) => Validators.confirmPassword(v, _passwordController.text),
+                    decoration: const InputDecoration(
+                        labelText: 'Confirm Password',
+                        prefixIcon: Icon(Icons.lock_outline)),
+                    validator: (v) =>
+                        Validators.confirmPassword(v, _passwordController.text),
                   ),
                   const SizedBox(height: 24),
                   ElevatedButton(
                     onPressed: _loading ? null : _submit,
                     child: _loading
-                        ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white))
                         : const Text('Create Account'),
                   ),
                   const SizedBox(height: 16),
@@ -145,7 +167,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Text('Already have an account?'),
-                      TextButton(onPressed: () => context.go('/login'), child: const Text('Log in')),
+                      TextButton(
+                          onPressed: () => context.go('/login'),
+                          child: const Text('Log in')),
                     ],
                   ),
                 ],
@@ -165,7 +189,12 @@ class _RoleCard extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
 
-  const _RoleCard({required this.label, required this.subtitle, required this.iconName, required this.selected, required this.onTap});
+  const _RoleCard(
+      {required this.label,
+      required this.subtitle,
+      required this.iconName,
+      required this.selected,
+      required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -175,17 +204,30 @@ class _RoleCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
         decoration: BoxDecoration(
-          color: selected ? AppColors.primary.withValues(alpha: 0.08) : AppColors.surface,
-          border: Border.all(color: selected ? AppColors.primary : AppColors.border, width: selected ? 2 : 1),
+          color: selected
+              ? AppColors.primary.withValues(alpha: 0.08)
+              : AppColors.surface,
+          border: Border.all(
+              color: selected ? AppColors.primary : AppColors.border,
+              width: selected ? 2 : 1),
           borderRadius: BorderRadius.circular(14),
         ),
         child: Column(
           children: [
-            AppIconAsset(iconName, color: selected ? AppColors.primary : AppColors.textSecondary, size: 32),
+            AppIconAsset(iconName,
+                color: selected ? AppColors.primary : AppColors.textSecondary,
+                size: 32),
             const SizedBox(height: 8),
-            Text(label, style: TextStyle(fontWeight: FontWeight.w700, color: selected ? AppColors.primary : AppColors.textPrimary)),
+            Text(label,
+                style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color:
+                        selected ? AppColors.primary : AppColors.textPrimary)),
             const SizedBox(height: 4),
-            Text(subtitle, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+            Text(subtitle,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                    fontSize: 12, color: AppColors.textSecondary)),
           ],
         ),
       ),
