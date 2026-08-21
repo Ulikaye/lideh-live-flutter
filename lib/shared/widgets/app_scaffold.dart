@@ -16,7 +16,11 @@ class AppScaffold extends StatelessWidget {
   final int currentIndex;
   final UserType? userType;
 
-  const AppScaffold({super.key, required this.child, required this.currentIndex, this.userType});
+  const AppScaffold(
+      {super.key,
+      required this.child,
+      required this.currentIndex,
+      this.userType});
 
   // Icon names map to files in assets/icons/ (custom brand icon set).
   // The same asset is used for both the selected and unselected slot —
@@ -39,7 +43,19 @@ class AppScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     if (Responsive.isMobile(context)) {
       return Scaffold(
-        body: SafeArea(child: child),
+        body: SafeArea(
+          child: PopScope(
+            // Allow back only if we are already on the Home tab (index 0)
+            canPop: currentIndex == 0,
+            onPopInvoked: (didPop) {
+              // If the back was not handled (canPop was false), navigate to Home
+              if (!didPop && currentIndex != 0) {
+                _onSelect(context, 0);
+              }
+            },
+            child: child,
+          ),
+        ),
         bottomNavigationBar: NavigationBar(
           selectedIndex: currentIndex,
           onDestinationSelected: (i) => _onSelect(context, i),
@@ -67,7 +83,8 @@ class AppScaffold extends StatelessWidget {
                 children: [
                   Image.asset('assets/images/logo.png', height: 40),
                   const SizedBox(height: 4),
-                  Text(AppStrings.appName, style: Theme.of(context).textTheme.titleMedium),
+                  Text(AppStrings.appName,
+                      style: Theme.of(context).textTheme.titleMedium),
                 ],
               ),
             ),
@@ -80,7 +97,17 @@ class AppScaffold extends StatelessWidget {
                 .toList(),
           ),
           const VerticalDivider(width: 1),
-          Expanded(child: child),
+          Expanded(
+            child: PopScope(
+              canPop: currentIndex == 0,
+              onPopInvoked: (didPop) {
+                if (!didPop && currentIndex != 0) {
+                  _onSelect(context, 0);
+                }
+              },
+              child: child,
+            ),
+          ),
         ],
       ),
     );
