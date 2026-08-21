@@ -64,9 +64,6 @@ final _publicRoutes = <String>{
   '/credits',
 };
 
-/// Any route not in [_publicRoutes] (and not a detail page nested under
-/// a public prefix) requires an authenticated session. Role-specific
-/// dashboards are additionally checked in their own screens.
 bool _isPublic(String path) {
   if (_publicRoutes.contains(path)) return true;
   if (path.startsWith('/musicians/')) return true;
@@ -92,26 +89,45 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isLoggedIn = FirebaseAuth.instance.currentUser != null;
       final path = state.matchedLocation;
 
+      // 🔥 DEBUG: print every redirect check
+      debugPrint('🔁 Redirect: path="$path", isLoggedIn=$isLoggedIn');
+
+      // 🚀 FORCE allow /profile-setup when logged in
+      if (path == '/profile-setup') {
+        if (isLoggedIn) {
+          debugPrint('✅ Allowing /profile-setup');
+          return null; // stay on setup
+        } else {
+          debugPrint('❌ Not logged in, redirect to login');
+          return '/login?redirect=${Uri.encodeComponent(path)}';
+        }
+      }
+
       final goingToAuthPages = path == '/login' || path == '/register';
 
       if (!isLoggedIn && !_isPublic(path)) {
+        debugPrint('🔒 Not logged in, public? false -> redirect to login');
         return '/login?redirect=${Uri.encodeComponent(path)}';
       }
       if (isLoggedIn && goingToAuthPages) {
+        debugPrint('🚫 Logged in and going to auth page -> redirect to /');
         return '/';
       }
       if (isLoggedIn && path != '/account-deactivated') {
         final profile = ref.read(currentUserProfileProvider).value;
         if (profile?.disabled == true) {
+          debugPrint('⛔ Account disabled -> redirect to /account-deactivated');
           return '/account-deactivated';
         }
       }
       if (path.startsWith('/admin')) {
         final profile = ref.read(currentUserProfileProvider).value;
         if (profile?.userType != UserType.admin) {
+          debugPrint('🛑 Not admin -> redirect to /');
           return '/';
         }
       }
+      debugPrint('✅ No redirect, stay on $path');
       return null;
     },
     routes: [
@@ -297,14 +313,13 @@ final routerProvider = Provider<GoRouter>((ref) {
           builder: (_, s) =>
               LoginScreen(redirectTo: s.uri.queryParameters['redirect'])),
       GoRoute(path: '/register', builder: (_, __) => const RegisterScreen()),
-      // Modified: pass userType as query parameter
       GoRoute(
         path: '/profile-setup',
         builder: (_, state) {
           final userTypeParam = state.uri.queryParameters['userType'];
           final userType = userTypeParam != null
               ? UserType.values.firstWhere((e) => e.name == userTypeParam)
-              : UserType.organizer; // fallback
+              : UserType.organizer;
           return ProfileSetupScreen(userType: userType);
         },
       ),
@@ -321,7 +336,6 @@ int _indexForPath(String path) {
   return 0;
 }
 
-/// Routes `/dashboard` to the correct role-specific dashboard.
 class DashboardRouterScreen extends ConsumerWidget {
   const DashboardRouterScreen({super.key});
 
