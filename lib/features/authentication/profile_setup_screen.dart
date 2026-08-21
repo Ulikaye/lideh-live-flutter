@@ -63,23 +63,29 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
     if (_imageFile == null) return;
     setState(() => _uploadingImage = true);
     try {
-      final uid = FirebaseAuth.instance.currentUser!.uid;
-      // Use profile_pictures/ path – matches your storage rules
-      final storageRef =
-          FirebaseStorage.instance.ref().child('profile_pictures/$uid.jpg');
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) throw Exception('Not signed in');
 
-      // ✅ Explicit metadata to fix 403 error
+      // ✅ Force token refresh to ensure it's valid
+      await user.getIdToken(true);
+
+      final uid = user.uid;
+      // Use 'musician_media/' – allowed in your rules, 50MB limit
+      final storageRef = FirebaseStorage.instance.ref().child(
+        'musician_media/$uid.jpg',
+      );
+
       final metadata = SettableMetadata(contentType: 'image/jpeg');
       await storageRef.putFile(_imageFile!, metadata);
       final url = await storageRef.getDownloadURL();
       setState(() => _uploadedImageUrl = url);
-      debugPrint('Image uploaded: $url');
+      debugPrint('✅ Image uploaded: $url');
     } catch (e) {
-      debugPrint('Upload error: $e');
+      debugPrint('❌ Upload error: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Image upload failed: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Image upload failed: $e')));
       }
     } finally {
       if (mounted) setState(() => _uploadingImage = false);
@@ -97,7 +103,8 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text('You must be logged in to set up your profile.')),
+            content: Text('You must be logged in to set up your profile.'),
+          ),
         );
         context.go('/login');
       }
@@ -136,7 +143,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
             startingPrice: double.tryParse(_priceController.text.trim()),
             yearsOfExperience: int.tryParse(_experienceController.text.trim()),
             youtubeVideoId: _extractYoutubeId(_youtubeController.text.trim()),
-            photoURL: _uploadedImageUrl, // ✅ Save the uploaded photo URL
+            photoURL: _uploadedImageUrl,
             joinedAt: DateTime.now(),
           ),
         );
@@ -155,13 +162,10 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
         );
       }
 
-      await firestore.updateUser(
-        uid,
-        {
-          'location': _locationController.text.trim(),
-          'bio': _bioController.text.trim(),
-        },
-      );
+      await firestore.updateUser(uid, {
+        'location': _locationController.text.trim(),
+        'bio': _bioController.text.trim(),
+      });
 
       debugPrint('PROFILE SETUP: User profile updated successfully.');
 
@@ -175,9 +179,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              'Failed to save profile: $e',
-            ),
+            content: Text('Failed to save profile: $e'),
             duration: const Duration(seconds: 8),
           ),
         );
@@ -224,18 +226,18 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                           : null,
                       child: _uploadedImageUrl == null
                           ? (_uploadingImage
-                              ? const SizedBox(
-                                  width: 24,
-                                  height: 24,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Icon(
-                                  Icons.camera_alt,
-                                  size: 40,
-                                  color: Colors.grey,
-                                ))
+                                ? const SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons.camera_alt,
+                                    size: 40,
+                                    color: Colors.grey,
+                                  ))
                           : null,
                     ),
                   ),
@@ -270,8 +272,9 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                   TextFormField(
                     controller: _locationController,
                     decoration: const InputDecoration(
-                        labelText: 'City / Region',
-                        prefixIcon: Icon(Icons.location_on_outlined)),
+                      labelText: 'City / Region',
+                      prefixIcon: Icon(Icons.location_on_outlined),
+                    ),
                     validator: (v) => Validators.required(v, field: 'Location'),
                   ),
                   const SizedBox(height: 16),
@@ -281,7 +284,9 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                     controller: _bioController,
                     maxLines: 3,
                     decoration: const InputDecoration(
-                        labelText: 'Short bio', alignLabelWithHint: true),
+                      labelText: 'Short bio',
+                      alignLabelWithHint: true,
+                    ),
                   ),
                   const SizedBox(height: 24),
 
@@ -293,7 +298,10 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                             height: 20,
                             width: 20,
                             child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white))
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
                         : const Text('Finish Setup'),
                   ),
                 ],
@@ -312,13 +320,16 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
       TextFormField(
         controller: _stageNameController,
         decoration: const InputDecoration(
-            labelText: 'Stage / performing name',
-            prefixIcon: Icon(Icons.badge_outlined)),
+          labelText: 'Stage / performing name',
+          prefixIcon: Icon(Icons.badge_outlined),
+        ),
         validator: (v) => Validators.required(v, field: 'Stage name'),
       ),
       const SizedBox(height: 16),
-      Text('Skills / instruments',
-          style: Theme.of(context).textTheme.titleMedium),
+      Text(
+        'Skills / instruments',
+        style: Theme.of(context).textTheme.titleMedium,
+      ),
       const SizedBox(height: 8),
       skillsAsync.when(
         loading: () => const LinearProgressIndicator(),
@@ -331,9 +342,11 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
             return FilterChip(
               label: Text(skill.name),
               selected: selected,
-              onSelected: (v) => setState(() => v
-                  ? _selectedSkills.add(skill.name)
-                  : _selectedSkills.remove(skill.name)),
+              onSelected: (v) => setState(
+                () => v
+                    ? _selectedSkills.add(skill.name)
+                    : _selectedSkills.remove(skill.name),
+              ),
             );
           }).toList(),
         ),
@@ -345,8 +358,9 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
             child: TextFormField(
               controller: _priceController,
               keyboardType: TextInputType.number,
-              decoration:
-                  const InputDecoration(labelText: 'Starting price (USD)'),
+              decoration: const InputDecoration(
+                labelText: 'Starting price (USD)',
+              ),
               validator: (v) => Validators.positiveNumber(v, field: 'Price'),
             ),
           ),
@@ -355,8 +369,9 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
             child: TextFormField(
               controller: _experienceController,
               keyboardType: TextInputType.number,
-              decoration:
-                  const InputDecoration(labelText: 'Years of experience'),
+              decoration: const InputDecoration(
+                labelText: 'Years of experience',
+              ),
             ),
           ),
         ],
@@ -365,8 +380,9 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
       TextFormField(
         controller: _youtubeController,
         decoration: const InputDecoration(
-            labelText: 'YouTube video link (optional)',
-            prefixIcon: Icon(Icons.play_circle_outline)),
+          labelText: 'YouTube video link (optional)',
+          prefixIcon: Icon(Icons.play_circle_outline),
+        ),
         validator: Validators.youtubeUrl,
       ),
     ];
@@ -378,15 +394,17 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
       TextFormField(
         controller: _orgNameController,
         decoration: const InputDecoration(
-            labelText: 'Organization name',
-            prefixIcon: Icon(Icons.church_outlined)),
+          labelText: 'Organization name',
+          prefixIcon: Icon(Icons.church_outlined),
+        ),
         validator: (v) => Validators.required(v, field: 'Organization name'),
       ),
       const SizedBox(height: 16),
       TextFormField(
         controller: _churchController,
-        decoration:
-            const InputDecoration(labelText: 'Church affiliation (optional)'),
+        decoration: const InputDecoration(
+          labelText: 'Church affiliation (optional)',
+        ),
       ),
     ];
   }
