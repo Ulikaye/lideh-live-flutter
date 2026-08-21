@@ -89,30 +89,31 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isLoggedIn = FirebaseAuth.instance.currentUser != null;
       final path = state.matchedLocation;
 
-      // 🔥 DEBUG: print every redirect check
       debugPrint('🔁 Redirect: path="$path", isLoggedIn=$isLoggedIn');
 
       // 🚀 FORCE allow /profile-setup when logged in
       if (path == '/profile-setup') {
         if (isLoggedIn) {
           debugPrint('✅ Allowing /profile-setup');
-          return null; // stay on setup
+          return null;
         } else {
           debugPrint('❌ Not logged in, redirect to login');
           return '/login?redirect=${Uri.encodeComponent(path)}';
         }
       }
 
-      final goingToAuthPages = path == '/login' || path == '/register';
+      // 📌 REMOVED: the redirect that sent logged-in users away from /register.
+      // if (isLoggedIn && (path == '/login' || path == '/register')) {
+      //   return '/';
+      // }
 
+      // If not logged in and path is not public, go to login
       if (!isLoggedIn && !_isPublic(path)) {
         debugPrint('🔒 Not logged in, public? false -> redirect to login');
         return '/login?redirect=${Uri.encodeComponent(path)}';
       }
-      if (isLoggedIn && goingToAuthPages) {
-        debugPrint('🚫 Logged in and going to auth page -> redirect to /');
-        return '/';
-      }
+
+      // If logged in, check for deactivated account
       if (isLoggedIn && path != '/account-deactivated') {
         final profile = ref.read(currentUserProfileProvider).value;
         if (profile?.disabled == true) {
@@ -120,6 +121,8 @@ final routerProvider = Provider<GoRouter>((ref) {
           return '/account-deactivated';
         }
       }
+
+      // Admin routes check
       if (path.startsWith('/admin')) {
         final profile = ref.read(currentUserProfileProvider).value;
         if (profile?.userType != UserType.admin) {
@@ -127,6 +130,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           return '/';
         }
       }
+
       debugPrint('✅ No redirect, stay on $path');
       return null;
     },
