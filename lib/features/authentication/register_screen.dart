@@ -38,12 +38,27 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             userType: _userType,
             displayName: _nameController.text.trim(),
           );
-      if (mounted) {
-        // Pass the userType to the profile setup screen
-        context.go('/profile-setup?userType=${_userType.name}');
-      }
+
+      // 🔥 DEBUG: confirm we are about to navigate
+      print(
+          '✅ Registration successful, navigating to /profile-setup?userType=${_userType.name}');
+
+      // Use a post-frame callback to ensure the widget is fully mounted
+      // and the router is ready.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          context.go('/profile-setup?userType=${_userType.name}');
+        } else {
+          print('❌ Widget not mounted, cannot navigate.');
+        }
+      });
     } on FirebaseAuthException catch (e) {
       setState(() => _error = _friendlyAuthError(e.code));
+    } catch (e, stack) {
+      // Catch any other errors (e.g., Firestore permission issues)
+      print('❌ Registration error (non-auth): $e');
+      print(stack);
+      setState(() => _error = 'Registration failed: $e');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
