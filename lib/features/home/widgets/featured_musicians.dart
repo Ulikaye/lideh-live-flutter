@@ -19,21 +19,27 @@ class FeaturedMusicians extends ConsumerWidget {
           scrollDirection: Axis.horizontal,
           itemCount: 3,
           separatorBuilder: (_, __) => const SizedBox(width: 16),
-          itemBuilder: (context, index) => const SizedBox(width: 280, child: MusicianCardSkeleton()),
+          itemBuilder: (context, index) =>
+              const SizedBox(width: 280, child: MusicianCardSkeleton()),
         ),
       ),
-      error: (e, _) => AppErrorWidget(message: 'Could not load featured musicians'),
+      error: (e, _) =>
+          AppErrorWidget(message: 'Could not load featured musicians'),
       data: (musicians) {
-        if (musicians.isEmpty) {
-          return const EmptyStateWidget(title: 'No musicians yet', subtitle: 'Check back soon!');
+        // ✅ Extra safety: filter out unverified musicians
+        final filtered = musicians.where((m) => m.verified).toList();
+        if (filtered.isEmpty) {
+          return const EmptyStateWidget(
+              title: 'No musicians yet', subtitle: 'Check back soon!');
         }
         return SizedBox(
           height: 260,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
-            itemCount: musicians.length,
+            itemCount: filtered.length,
             separatorBuilder: (_, __) => const SizedBox(width: 16),
-            itemBuilder: (context, index) => SizedBox(width: 280, child: MusicianCard(musician: musicians[index])),
+            itemBuilder: (context, index) => SizedBox(
+                width: 280, child: MusicianCard(musician: filtered[index])),
           ),
         );
       },

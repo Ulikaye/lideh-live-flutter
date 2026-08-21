@@ -1,8 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart'; // ✅ Added for direct Firestore access
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../core/constants/strings.dart';
 import '../../core/utils/validators.dart';
 import '../../models/musician.dart';
@@ -39,8 +42,51 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
   final _orgNameController = TextEditingController();
   final _churchController = TextEditingController();
 
+  // Profile picture
+  File? _imageFile;
+  String? _uploadedImageUrl;
+  bool _uploadingImage = false;
+
   bool _saving = false;
 
+  // ---------- Image picker & upload ----------
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(source: ImageSource.gallery);
+    if (picked != null) {
+      setState(() => _imageFile = File(picked.path));
+      await _uploadImage();
+    }
+  }
+
+  Future<void> _uploadImage() async {
+    if (_imageFile == null) return;
+    setState(() => _uploadingImage = true);
+    try {
+      final uid = FirebaseAuth.instance.currentUser!.uid;
+      // Use profile_pictures/ path – matches your storage rules
+      final storageRef =
+          FirebaseStorage.instance.ref().child('profile_pictures/$uid.jpg');
+
+      // ✅ Explicit metadata to fix 403 error
+      final metadata = SettableMetadata(contentType: 'image/jpeg');
+      await storageRef.putFile(_imageFile!, metadata);
+      final url = await storageRef.getDownloadURL();
+      setState(() => _uploadedImageUrl = url);
+      debugPrint('Image uploaded: $url');
+    } catch (e) {
+      debugPrint('Upload error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Image upload failed: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _uploadingImage = false);
+    }
+  }
+
+  // ---------- Form submission ----------
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -63,7 +109,6 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
 
     try {
       // ✅ Safety net: create the user document if it's missing
-      // (Uses FirebaseFirestore.instance directly to avoid private access)
       final userDoc = FirebaseFirestore.instance
           .collection(AppStrings.usersCollection)
           .doc(uid);
@@ -91,6 +136,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
             startingPrice: double.tryParse(_priceController.text.trim()),
             yearsOfExperience: int.tryParse(_experienceController.text.trim()),
             youtubeVideoId: _extractYoutubeId(_youtubeController.text.trim()),
+            photoURL: _uploadedImageUrl, // ✅ Save the uploaded photo URL
             joinedAt: DateTime.now(),
           ),
         );
@@ -150,6 +196,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
     return match?.group(1);
   }
 
+  // ---------- Build ----------
   @override
   Widget build(BuildContext context) {
     final userType = widget.userType;
@@ -166,6 +213,43 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  // ----- Profile picture picker -----
+                  GestureDetector(
+                    onTap: _pickImage,
+                    child: CircleAvatar(
+                      radius: 50,
+                      backgroundColor: Colors.grey.shade200,
+                      backgroundImage: _uploadedImageUrl != null
+                          ? NetworkImage(_uploadedImageUrl!)
+                          : null,
+                      child: _uploadedImageUrl == null
+                          ? (_uploadingImage
+                              ? const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.camera_alt,
+                                  size: 40,
+                                  color: Colors.grey,
+                                ))
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _uploadedImageUrl != null
+                        ? 'Tap to change photo'
+                        : 'Tap to add photo',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // ----- Welcome text -----
                   Text(
                     userType == UserType.musician
                         ? "Tell us about your music"
@@ -173,11 +257,16 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                     style: Theme.of(context).textTheme.headlineSmall,
                   ),
                   const SizedBox(height: 20),
+
+                  // ----- Role-specific fields -----
                   if (userType == UserType.musician)
                     ..._musicianFields()
                   else
                     ..._organizerFields(),
+
                   const SizedBox(height: 16),
+
+                  // ----- Location -----
                   TextFormField(
                     controller: _locationController,
                     decoration: const InputDecoration(
@@ -186,6 +275,8 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                     validator: (v) => Validators.required(v, field: 'Location'),
                   ),
                   const SizedBox(height: 16),
+
+                  // ----- Bio -----
                   TextFormField(
                     controller: _bioController,
                     maxLines: 3,
@@ -193,6 +284,8 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                         labelText: 'Short bio', alignLabelWithHint: true),
                   ),
                   const SizedBox(height: 24),
+
+                  // ----- Submit button -----
                   ElevatedButton(
                     onPressed: _saving ? null : _submit,
                     child: _saving
@@ -212,6 +305,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
     );
   }
 
+  // ---------- Musician fields ----------
   List<Widget> _musicianFields() {
     final skillsAsync = ref.watch(skillsProvider);
     return [
@@ -278,6 +372,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
     ];
   }
 
+  // ---------- Organizer fields ----------
   List<Widget> _organizerFields() {
     return [
       TextFormField(
