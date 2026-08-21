@@ -40,34 +40,74 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
 
   Future<void> _submit(UserType userType) async {
     if (!_formKey.currentState!.validate()) return;
+
     setState(() => _saving = true);
+
     final uid = ref.read(authServiceProvider).currentUser!.uid;
     final firestore = ref.read(firestoreServiceProvider);
 
     try {
       if (userType == UserType.musician) {
-        await firestore.setMusicianProfile(Musician(
-          uid: uid,
-          stageName: _stageNameController.text.trim(),
-          skills: _selectedSkills.toList(),
-          location: _locationController.text.trim(),
-          startingPrice: double.tryParse(_priceController.text.trim()),
-          yearsOfExperience: int.tryParse(_experienceController.text.trim()),
-          youtubeVideoId: _extractYoutubeId(_youtubeController.text.trim()),
-          joinedAt: DateTime.now(),
-        ));
+        debugPrint('PROFILE SETUP: Creating musician document for UID: $uid');
+
+        await firestore.setMusicianProfile(
+          Musician(
+            uid: uid,
+            stageName: _stageNameController.text.trim(),
+            skills: _selectedSkills.toList(),
+            location: _locationController.text.trim(),
+            startingPrice: double.tryParse(_priceController.text.trim()),
+            yearsOfExperience: int.tryParse(_experienceController.text.trim()),
+            youtubeVideoId: _extractYoutubeId(_youtubeController.text.trim()),
+            joinedAt: DateTime.now(),
+          ),
+        );
+
+        debugPrint(
+          'PROFILE SETUP: Musician document created successfully for UID: $uid',
+        );
       } else {
-        await firestore.setOrganizerProfile(Organizer(
-          uid: uid,
-          organizationName: _orgNameController.text.trim(),
-          churchAffiliation: _churchController.text.trim(),
-          location: _locationController.text.trim(),
-        ));
+        await firestore.setOrganizerProfile(
+          Organizer(
+            uid: uid,
+            organizationName: _orgNameController.text.trim(),
+            churchAffiliation: _churchController.text.trim(),
+            location: _locationController.text.trim(),
+          ),
+        );
       }
-      await firestore.updateUser(uid, {'location': _locationController.text.trim(), 'bio': _bioController.text.trim()});
-      if (mounted) context.go('/');
+
+      await firestore.updateUser(
+        uid,
+        {
+          'location': _locationController.text.trim(),
+          'bio': _bioController.text.trim(),
+        },
+      );
+
+      debugPrint('PROFILE SETUP: User profile updated successfully.');
+
+      if (mounted) {
+        context.go('/');
+      }
+    } catch (e, stackTrace) {
+      debugPrint('PROFILE SETUP ERROR: $e');
+      debugPrintStack(stackTrace: stackTrace);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Failed to save profile: $e',
+            ),
+            duration: const Duration(seconds: 8),
+          ),
+        );
+      }
     } finally {
-      if (mounted) setState(() => _saving = false);
+      if (mounted) {
+        setState(() => _saving = false);
+      }
     }
   }
 
@@ -88,7 +128,9 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
         loading: () => const LoadingIndicator(),
         error: (e, _) => Center(child: Text('Error: $e')),
         data: (profile) {
-          if (profile == null) return const LoadingIndicator(message: 'Setting up your account...');
+          if (profile == null)
+            return const LoadingIndicator(
+                message: 'Setting up your account...');
           final userType = profile.userType;
 
           return Center(
@@ -102,28 +144,41 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(
-                        userType == UserType.musician ? "Tell us about your music" : 'Tell us about your organization',
+                        userType == UserType.musician
+                            ? "Tell us about your music"
+                            : 'Tell us about your organization',
                         style: Theme.of(context).textTheme.headlineSmall,
                       ),
                       const SizedBox(height: 20),
-                      if (userType == UserType.musician) ..._musicianFields() else ..._organizerFields(),
+                      if (userType == UserType.musician)
+                        ..._musicianFields()
+                      else
+                        ..._organizerFields(),
                       const SizedBox(height: 16),
                       TextFormField(
                         controller: _locationController,
-                        decoration: const InputDecoration(labelText: 'City / Region', prefixIcon: Icon(Icons.location_on_outlined)),
-                        validator: (v) => Validators.required(v, field: 'Location'),
+                        decoration: const InputDecoration(
+                            labelText: 'City / Region',
+                            prefixIcon: Icon(Icons.location_on_outlined)),
+                        validator: (v) =>
+                            Validators.required(v, field: 'Location'),
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
                         controller: _bioController,
                         maxLines: 3,
-                        decoration: const InputDecoration(labelText: 'Short bio', alignLabelWithHint: true),
+                        decoration: const InputDecoration(
+                            labelText: 'Short bio', alignLabelWithHint: true),
                       ),
                       const SizedBox(height: 24),
                       ElevatedButton(
                         onPressed: _saving ? null : () => _submit(userType),
                         child: _saving
-                            ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: Colors.white))
                             : const Text('Finish Setup'),
                       ),
                     ],
@@ -142,11 +197,14 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
     return [
       TextFormField(
         controller: _stageNameController,
-        decoration: const InputDecoration(labelText: 'Stage / performing name', prefixIcon: Icon(Icons.badge_outlined)),
+        decoration: const InputDecoration(
+            labelText: 'Stage / performing name',
+            prefixIcon: Icon(Icons.badge_outlined)),
         validator: (v) => Validators.required(v, field: 'Stage name'),
       ),
       const SizedBox(height: 16),
-      Text('Skills / instruments', style: Theme.of(context).textTheme.titleMedium),
+      Text('Skills / instruments',
+          style: Theme.of(context).textTheme.titleMedium),
       const SizedBox(height: 8),
       skillsAsync.when(
         loading: () => const LinearProgressIndicator(),
@@ -159,7 +217,9 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
             return FilterChip(
               label: Text(skill.name),
               selected: selected,
-              onSelected: (v) => setState(() => v ? _selectedSkills.add(skill.name) : _selectedSkills.remove(skill.name)),
+              onSelected: (v) => setState(() => v
+                  ? _selectedSkills.add(skill.name)
+                  : _selectedSkills.remove(skill.name)),
             );
           }).toList(),
         ),
@@ -171,7 +231,8 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
             child: TextFormField(
               controller: _priceController,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Starting price (USD)'),
+              decoration:
+                  const InputDecoration(labelText: 'Starting price (USD)'),
               validator: (v) => Validators.positiveNumber(v, field: 'Price'),
             ),
           ),
@@ -180,7 +241,8 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
             child: TextFormField(
               controller: _experienceController,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Years of experience'),
+              decoration:
+                  const InputDecoration(labelText: 'Years of experience'),
             ),
           ),
         ],
@@ -188,7 +250,9 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
       const SizedBox(height: 16),
       TextFormField(
         controller: _youtubeController,
-        decoration: const InputDecoration(labelText: 'YouTube video link (optional)', prefixIcon: Icon(Icons.play_circle_outline)),
+        decoration: const InputDecoration(
+            labelText: 'YouTube video link (optional)',
+            prefixIcon: Icon(Icons.play_circle_outline)),
         validator: Validators.youtubeUrl,
       ),
     ];
@@ -198,13 +262,16 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
     return [
       TextFormField(
         controller: _orgNameController,
-        decoration: const InputDecoration(labelText: 'Organization name', prefixIcon: Icon(Icons.church_outlined)),
+        decoration: const InputDecoration(
+            labelText: 'Organization name',
+            prefixIcon: Icon(Icons.church_outlined)),
         validator: (v) => Validators.required(v, field: 'Organization name'),
       ),
       const SizedBox(height: 16),
       TextFormField(
         controller: _churchController,
-        decoration: const InputDecoration(labelText: 'Church affiliation (optional)'),
+        decoration:
+            const InputDecoration(labelText: 'Church affiliation (optional)'),
       ),
     ];
   }

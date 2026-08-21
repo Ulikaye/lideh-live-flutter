@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../providers/auth_provider.dart';
 import '../../models/user_profile.dart';
 import '../constants/strings.dart';
@@ -93,8 +94,25 @@ final routerProvider = Provider<GoRouter>((ref) {
     initialLocation: '/',
     refreshListenable: authNotifier,
     redirect: (context, state) {
-      final auth = ref.read(authStateProvider);
-      final isLoggedIn = auth.value != null;
+      // FirebaseAuth.instance.currentUser rather than
+      // ref.read(authStateProvider).value — deliberately. Right after
+      // registerWithEmail() completes and register_screen.dart calls
+      // context.go('/profile-setup'), the Riverpod-cached stream
+      // value can briefly still reflect the pre-registration
+      // (logged-out) state, since the stream event and the awaited
+      // Future don't resolve on the same tick. That momentary false
+      // "not logged in" read was bouncing brand-new users:
+      // /profile-setup -> (looks logged out) -> /login -> (stream
+      // catches up, /login now looks like an auth page to leave) ->
+      // /. Net effect: every new registration landed on home,
+      // profile-setup was never actually seen, and — for
+      // musicians specifically — musicians/{uid} was never created,
+      // since that write only happens inside profile-setup's submit.
+      // FirebaseAuth's own currentUser getter is updated synchronously
+      // by the SDK the moment sign-in/registration completes, with no
+      // stream-propagation delay, so it's never stale here the way
+      // the stream-derived value briefly can be.
+      final isLoggedIn = FirebaseAuth.instance.currentUser != null;
       final path = state.matchedLocation;
 
       final goingToAuthPages = path == '/login' || path == '/register';
@@ -170,19 +188,31 @@ final routerProvider = Provider<GoRouter>((ref) {
                 state: s,
                 child: AdminBlogEditorScreen(postId: s.pathParameters['id'])),
           ),
-          GoRoute(path: '/admin/e-cards', builder: (_, __) => const AdminEcardListScreen()),
-          GoRoute(path: '/admin/ecard-requests', builder: (_, __) => const AdminEcardRequestsScreen()),
-          GoRoute(path: '/admin/users', builder: (_, __) => const AdminUserListScreen()),
-          GoRoute(path: '/admin/events', builder: (_, __) => const AdminEventListScreen()),
-          GoRoute(path: '/admin/messages', builder: (_, __) => const AdminMessagesScreen()),
+          GoRoute(
+              path: '/admin/e-cards',
+              builder: (_, __) => const AdminEcardListScreen()),
+          GoRoute(
+              path: '/admin/ecard-requests',
+              builder: (_, __) => const AdminEcardRequestsScreen()),
+          GoRoute(
+              path: '/admin/users',
+              builder: (_, __) => const AdminUserListScreen()),
+          GoRoute(
+              path: '/admin/events',
+              builder: (_, __) => const AdminEventListScreen()),
+          GoRoute(
+              path: '/admin/messages',
+              builder: (_, __) => const AdminMessagesScreen()),
           GoRoute(
             path: '/admin/messages/:uid',
             pageBuilder: (_, s) => slideTransitionPage(
-                state: s, child: AdminMessageThreadScreen(uid: s.pathParameters['uid']!)),
+                state: s,
+                child: AdminMessageThreadScreen(uid: s.pathParameters['uid']!)),
           ),
           GoRoute(
             path: '/messages',
-            pageBuilder: (_, s) => slideTransitionPage(state: s, child: const UserMessageScreen()),
+            pageBuilder: (_, s) =>
+                slideTransitionPage(state: s, child: const UserMessageScreen()),
           ),
           GoRoute(
               path: '/account-deactivated',
@@ -190,40 +220,49 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
               path: '/dashboard',
               builder: (_, __) => const DashboardRouterScreen()),
-          GoRoute(path: '/e-cards/public', builder: (_, __) => const PublicEcardsScreen()),
+          GoRoute(
+              path: '/e-cards/public',
+              builder: (_, __) => const PublicEcardsScreen()),
           GoRoute(
             path: '/e-cards/public/:id',
             pageBuilder: (_, s) => slideTransitionPage(
-                state: s, child: PublicEcardScreen(ecardId: s.pathParameters['id']!)),
+                state: s,
+                child: PublicEcardScreen(ecardId: s.pathParameters['id']!)),
           ),
-          GoRoute(path: '/e-cards', builder: (_, __) => const EcardListScreen()),
+          GoRoute(
+              path: '/e-cards', builder: (_, __) => const EcardListScreen()),
           GoRoute(
             path: '/e-cards/create',
             pageBuilder: (_, s) => slideTransitionPage(
                 state: s,
-                child: CreateEcardScreen(eventId: s.uri.queryParameters['eventId'])),
+                child: CreateEcardScreen(
+                    eventId: s.uri.queryParameters['eventId'])),
           ),
           GoRoute(
             path: '/e-cards/:id',
             pageBuilder: (_, s) => slideTransitionPage(
-                state: s, child: EcardDetailScreen(ecardId: s.pathParameters['id']!)),
+                state: s,
+                child: EcardDetailScreen(ecardId: s.pathParameters['id']!)),
           ),
           GoRoute(
             path: '/e-cards/:id/guests',
             pageBuilder: (_, s) => slideTransitionPage(
-                state: s, child: GuestListScreen(ecardId: s.pathParameters['id']!)),
+                state: s,
+                child: GuestListScreen(ecardId: s.pathParameters['id']!)),
           ),
           GoRoute(
             path: '/e-cards/:id/guests/:guestId',
             pageBuilder: (_, s) => slideTransitionPage(
                 state: s,
                 child: GuestCardScreen(
-                    ecardId: s.pathParameters['id']!, guestId: s.pathParameters['guestId']!)),
+                    ecardId: s.pathParameters['id']!,
+                    guestId: s.pathParameters['guestId']!)),
           ),
           GoRoute(
             path: '/e-cards/:id/scan',
             pageBuilder: (_, s) => slideTransitionPage(
-                state: s, child: ScanEcardScreen(ecardId: s.pathParameters['id']!)),
+                state: s,
+                child: ScanEcardScreen(ecardId: s.pathParameters['id']!)),
           ),
           GoRoute(
               path: '/bookings', builder: (_, __) => const MyBookingsScreen()),
