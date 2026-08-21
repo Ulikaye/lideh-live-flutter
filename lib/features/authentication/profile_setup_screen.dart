@@ -221,18 +221,18 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                           : null,
                       child: _uploadedImageUrl == null
                           ? (_uploadingImage
-                                ? const SizedBox(
-                                    width: 24,
-                                    height: 24,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Icon(
-                                    Icons.camera_alt,
-                                    size: 40,
-                                    color: Colors.grey,
-                                  ))
+                              ? const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.camera_alt,
+                                  size: 40,
+                                  color: Colors.grey,
+                                ))
                           : null,
                     ),
                   ),
@@ -354,7 +354,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
               controller: _priceController,
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(
-                labelText: 'Starting price (USD)',
+                labelText: 'Starting price (Tsh)',
               ),
               validator: (v) => Validators.positiveNumber(v, field: 'Price'),
             ),

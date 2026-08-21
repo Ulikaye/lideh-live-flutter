@@ -114,7 +114,7 @@ class MusicianCard extends StatelessWidget {
                   children: [
                     if (musician.startingPrice != null)
                       Text(
-                          'From \$${musician.startingPrice!.toStringAsFixed(0)}',
+                          'From Tsh ${musician.startingPrice!.toStringAsFixed(0)}',
                           style: const TextStyle(
                               fontWeight: FontWeight.w700,
                               color: AppColors.textPrimary))
