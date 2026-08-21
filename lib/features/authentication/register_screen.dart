@@ -6,6 +6,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/strings.dart';
 import '../../core/utils/validators.dart';
 import '../../providers/auth_provider.dart';
+import '../../features/authentication/profile_setup_screen.dart';
 import '../../shared/widgets/app_icon_asset.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
@@ -39,13 +40,16 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             displayName: _nameController.text.trim(),
           );
 
-      print(
-          '✅ Registration successful, navigating to /profile-setup?userType=${_userType.name}');
-
-      // Navigate immediately – the widget is still mounted here
+      // ✅ Bypass the router to avoid the race condition.
+      // Use pushReplacement with a MaterialPageRoute to go directly to ProfileSetupScreen.
       if (mounted) {
-        context.go('/profile-setup?userType=${_userType.name}');
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => ProfileSetupScreen(userType: _userType),
+          ),
+        );
       } else {
+        // Fallback: try to use a global navigator key if needed (but shouldn't happen)
         print('❌ Widget not mounted, cannot navigate.');
       }
     } on FirebaseAuthException catch (e) {
