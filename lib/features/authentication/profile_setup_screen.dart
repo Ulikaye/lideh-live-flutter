@@ -14,10 +14,6 @@ import '../../providers/auth_provider.dart';
 import '../../providers/musician_provider.dart';
 import '../../shared/widgets/loading_indicator.dart';
 
-/// Shown once, immediately after registration, so the role-specific
-/// document (musicians/{uid} or organizers/{uid}) always exists before
-/// the user reaches the rest of the app — mirroring the mandatory
-/// "complete your profile" step in the original Django onboarding flow.
 class ProfileSetupScreen extends ConsumerStatefulWidget {
   final UserType userType;
   const ProfileSetupScreen({super.key, required this.userType});
@@ -66,20 +62,19 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) throw Exception('Not signed in');
 
-      // ✅ Force token refresh to ensure it's valid
+      // Force token refresh
       await user.getIdToken(true);
 
       final uid = user.uid;
-      // Use 'musician_media/' – allowed in your rules, 50MB limit
-      final storageRef = FirebaseStorage.instance.ref().child(
-        'musician_media/$uid.jpg',
-      );
+      final path = 'musician_media/$uid.jpg';
+      debugPrint('🔼 Uploading to: $path');
 
+      final storageRef = FirebaseStorage.instance.ref().child(path);
       final metadata = SettableMetadata(contentType: 'image/jpeg');
       await storageRef.putFile(_imageFile!, metadata);
       final url = await storageRef.getDownloadURL();
       setState(() => _uploadedImageUrl = url);
-      debugPrint('✅ Image uploaded: $url');
+      debugPrint('✅ Upload success: $url');
     } catch (e) {
       debugPrint('❌ Upload error: $e');
       if (mounted) {
@@ -115,7 +110,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
     final userType = widget.userType;
 
     try {
-      // ✅ Safety net: create the user document if it's missing
+      // Safety net: create the user document if missing
       final userDoc = FirebaseFirestore.instance
           .collection(AppStrings.usersCollection)
           .doc(uid);
@@ -215,7 +210,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // ----- Profile picture picker -----
+                  // Profile picture picker
                   GestureDetector(
                     onTap: _pickImage,
                     child: CircleAvatar(
@@ -251,7 +246,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                   ),
                   const SizedBox(height: 20),
 
-                  // ----- Welcome text -----
+                  // Welcome text
                   Text(
                     userType == UserType.musician
                         ? "Tell us about your music"
@@ -260,7 +255,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                   ),
                   const SizedBox(height: 20),
 
-                  // ----- Role-specific fields -----
+                  // Role-specific fields
                   if (userType == UserType.musician)
                     ..._musicianFields()
                   else
@@ -268,7 +263,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
 
                   const SizedBox(height: 16),
 
-                  // ----- Location -----
+                  // Location
                   TextFormField(
                     controller: _locationController,
                     decoration: const InputDecoration(
@@ -279,7 +274,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // ----- Bio -----
+                  // Bio
                   TextFormField(
                     controller: _bioController,
                     maxLines: 3,
@@ -290,7 +285,7 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // ----- Submit button -----
+                  // Submit button
                   ElevatedButton(
                     onPressed: _saving ? null : _submit,
                     child: _saving
