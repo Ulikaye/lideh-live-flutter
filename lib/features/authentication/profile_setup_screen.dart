@@ -129,12 +129,15 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
       if (userType == UserType.musician) {
         debugPrint('PROFILE SETUP: Creating musician document for UID: $uid');
 
+        // ✅ Convert location to lowercase for case‑insensitive search
+        final locationLower = _locationController.text.trim().toLowerCase();
+
         await firestore.setMusicianProfile(
           Musician(
             uid: uid,
             stageName: _stageNameController.text.trim(),
             skills: _selectedSkills.toList(),
-            location: _locationController.text.trim(),
+            location: locationLower,
             startingPrice: double.tryParse(_priceController.text.trim()),
             yearsOfExperience: int.tryParse(_experienceController.text.trim()),
             youtubeVideoId: _extractYoutubeId(_youtubeController.text.trim()),
@@ -152,13 +155,14 @@ class _ProfileSetupScreenState extends ConsumerState<ProfileSetupScreen> {
             uid: uid,
             organizationName: _orgNameController.text.trim(),
             churchAffiliation: _churchController.text.trim(),
-            location: _locationController.text.trim(),
+            location: _locationController.text.trim().toLowerCase(),
           ),
         );
       }
 
+      // ✅ Update user document location to lowercase
       await firestore.updateUser(uid, {
-        'location': _locationController.text.trim(),
+        'location': _locationController.text.trim().toLowerCase(),
         'bio': _bioController.text.trim(),
       });
 

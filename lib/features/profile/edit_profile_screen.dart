@@ -7,10 +7,6 @@ import '../../models/user_profile.dart';
 import '../../providers/auth_provider.dart';
 import '../../shared/widgets/loading_indicator.dart';
 
-/// Edits the base user profile (name/phone/location/bio/avatar).
-/// Role-specific fields (skills, price, org name, etc.) are edited from
-/// the musician/organizer dashboard rather than duplicated here, so
-/// there is exactly one place each field can be changed.
 class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
 
@@ -38,7 +34,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
   Future<void> _pickAndUploadPhoto() async {
     final picker = ImagePicker();
-    final picked = await picker.pickImage(source: ImageSource.gallery, maxWidth: 800, imageQuality: 85);
+    final picked = await picker.pickImage(
+        source: ImageSource.gallery, maxWidth: 800, imageQuality: 85);
     if (picked == null) return;
 
     setState(() => _uploadingPhoto = true);
@@ -50,7 +47,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             extension: 'jpg',
           );
       final uid = ref.read(authServiceProvider).currentUser!.uid;
-      await ref.read(firestoreServiceProvider).updateUser(uid, {'profile_picture_url': url});
+      await ref
+          .read(firestoreServiceProvider)
+          .updateUser(uid, {'profile_picture_url': url});
     } finally {
       if (mounted) setState(() => _uploadingPhoto = false);
     }
@@ -60,10 +59,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     setState(() => _saving = true);
     final uid = ref.read(authServiceProvider).currentUser!.uid;
     try {
+      // ✅ Convert location to lowercase for consistency
       await ref.read(firestoreServiceProvider).updateUser(uid, {
         'display_name': _nameController.text.trim(),
         'phone': _phoneController.text.trim(),
-        'location': _locationController.text.trim(),
+        'location': _locationController.text.trim().toLowerCase(),
         'bio': _bioController.text.trim(),
       });
       if (mounted) context.go('/profile');
@@ -98,18 +98,27 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                         children: [
                           CircleAvatar(
                             radius: 48,
-                            backgroundImage: profile.profilePictureUrl != null ? NetworkImage(profile.profilePictureUrl!) : null,
-                            child: profile.profilePictureUrl == null ? const Icon(Icons.person, size: 40) : null,
+                            backgroundImage: profile.profilePictureUrl != null
+                                ? NetworkImage(profile.profilePictureUrl!)
+                                : null,
+                            child: profile.profilePictureUrl == null
+                                ? const Icon(Icons.person, size: 40)
+                                : null,
                           ),
                           Positioned(
                             bottom: 0,
                             right: 0,
                             child: InkWell(
-                              onTap: _uploadingPhoto ? null : _pickAndUploadPhoto,
+                              onTap:
+                                  _uploadingPhoto ? null : _pickAndUploadPhoto,
                               child: CircleAvatar(
                                 radius: 16,
                                 child: _uploadingPhoto
-                                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                                    ? const SizedBox(
+                                        width: 14,
+                                        height: 14,
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2))
                                     : const Icon(Icons.camera_alt, size: 16),
                               ),
                             ),
@@ -118,18 +127,34 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                       ),
                     ),
                     const SizedBox(height: 24),
-                    TextFormField(controller: _nameController, decoration: const InputDecoration(labelText: 'Display name')),
+                    TextFormField(
+                        controller: _nameController,
+                        decoration:
+                            const InputDecoration(labelText: 'Display name')),
                     const SizedBox(height: 16),
-                    TextFormField(controller: _phoneController, decoration: const InputDecoration(labelText: 'Phone')),
+                    TextFormField(
+                        controller: _phoneController,
+                        decoration: const InputDecoration(labelText: 'Phone')),
                     const SizedBox(height: 16),
-                    TextFormField(controller: _locationController, decoration: const InputDecoration(labelText: 'Location')),
+                    TextFormField(
+                        controller: _locationController,
+                        decoration:
+                            const InputDecoration(labelText: 'Location')),
                     const SizedBox(height: 16),
-                    TextFormField(controller: _bioController, maxLines: 3, decoration: const InputDecoration(labelText: 'Bio', alignLabelWithHint: true)),
+                    TextFormField(
+                        controller: _bioController,
+                        maxLines: 3,
+                        decoration: const InputDecoration(
+                            labelText: 'Bio', alignLabelWithHint: true)),
                     const SizedBox(height: 24),
                     ElevatedButton(
                       onPressed: _saving ? null : _save,
                       child: _saving
-                          ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white))
                           : const Text('Save Changes'),
                     ),
                   ],

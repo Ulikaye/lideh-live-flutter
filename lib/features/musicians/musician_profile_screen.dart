@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/strings.dart';
 import '../../core/utils/responsive.dart';
@@ -31,7 +32,8 @@ class MusicianProfileScreen extends ConsumerWidget {
         error: (e, _) => AppErrorWidget(message: 'Could not load profile'),
         data: (musician) {
           if (musician == null) {
-            return const EmptyStateWidget(title: 'Musician not found', icon: Icons.person_off_outlined);
+            return const EmptyStateWidget(
+                title: 'Musician not found', icon: Icons.person_off_outlined);
           }
           return SingleChildScrollView(
             child: CenteredContent(
@@ -39,9 +41,14 @@ class MusicianProfileScreen extends ConsumerWidget {
                   ? Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(flex: 2, child: _ProfileHeader(musician: musician)),
+                        Expanded(
+                            flex: 2, child: _ProfileHeader(musician: musician)),
                         const SizedBox(width: 32),
-                        Expanded(flex: 1, child: _BookingSidebar(musicianId: musicianId, isOrganizer: isOrganizer)),
+                        Expanded(
+                            flex: 1,
+                            child: _BookingSidebar(
+                                musicianId: musicianId,
+                                isOrganizer: isOrganizer)),
                       ],
                     )
                   : Column(
@@ -49,7 +56,8 @@ class MusicianProfileScreen extends ConsumerWidget {
                       children: [
                         _ProfileHeader(musician: musician),
                         const SizedBox(height: 24),
-                        _BookingSidebar(musicianId: musicianId, isOrganizer: isOrganizer),
+                        _BookingSidebar(
+                            musicianId: musicianId, isOrganizer: isOrganizer),
                       ],
                     ),
             ),
@@ -75,10 +83,21 @@ class _ProfileHeader extends ConsumerWidget {
             CircleAvatar(
               radius: 44,
               backgroundColor: AppColors.primary.withValues(alpha: 0.12),
-              child: Text(
-                musician.stageName.isNotEmpty ? musician.stageName[0].toUpperCase() : '?',
-                style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700, fontSize: 32),
-              ),
+              backgroundImage:
+                  musician.photoURL != null && musician.photoURL!.isNotEmpty
+                      ? NetworkImage(musician.photoURL!)
+                      : null,
+              child: musician.photoURL == null || musician.photoURL!.isEmpty
+                  ? Text(
+                      musician.stageName.isNotEmpty
+                          ? musician.stageName[0].toUpperCase()
+                          : '?',
+                      style: const TextStyle(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 32),
+                    )
+                  : null,
             ),
             const SizedBox(width: 20),
             Expanded(
@@ -88,7 +107,9 @@ class _ProfileHeader extends ConsumerWidget {
                   Row(
                     children: [
                       Flexible(
-                        child: Text(musician.stageName, style: Theme.of(context).textTheme.headlineSmall, overflow: TextOverflow.ellipsis),
+                        child: Text(musician.stageName,
+                            style: Theme.of(context).textTheme.headlineSmall,
+                            overflow: TextOverflow.ellipsis),
                       ),
                       if (musician.verified) ...[
                         const SizedBox(width: 6),
@@ -97,9 +118,12 @@ class _ProfileHeader extends ConsumerWidget {
                     ],
                   ),
                   if (musician.location != null)
-                    Text(musician.location!, style: const TextStyle(color: AppColors.textSecondary)),
+                    Text(musician.location!,
+                        style: const TextStyle(color: AppColors.textSecondary)),
                   const SizedBox(height: 6),
-                  StarRatingDisplay(rating: musician.avgRating, reviewCount: musician.reviewCount),
+                  StarRatingDisplay(
+                      rating: musician.avgRating,
+                      reviewCount: musician.reviewCount),
                 ],
               ),
             ),
@@ -107,7 +131,12 @@ class _ProfileHeader extends ConsumerWidget {
         ),
         const SizedBox(height: 20),
         if (musician.skills.isNotEmpty)
-          Wrap(spacing: 8, runSpacing: 8, children: musician.skills.map<Widget>((s) => Chip(label: Text(s))).toList()),
+          Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: musician.skills
+                  .map<Widget>((s) => Chip(label: Text(s)))
+                  .toList()),
         const SizedBox(height: 20),
         if (musician.availabilityNotes != null) ...[
           Text('Availability', style: Theme.of(context).textTheme.titleMedium),
@@ -127,8 +156,11 @@ class _ProfileHeader extends ConsumerWidget {
           loading: () => const LinearProgressIndicator(),
           error: (_, __) => const Text('Could not load reviews'),
           data: (reviews) {
-            if (reviews.isEmpty) return const Text('No reviews yet.', style: TextStyle(color: AppColors.textSecondary));
-            return Column(children: reviews.map((r) => _ReviewTile(review: r)).toList());
+            if (reviews.isEmpty)
+              return const Text('No reviews yet.',
+                  style: TextStyle(color: AppColors.textSecondary));
+            return Column(
+                children: reviews.map((r) => _ReviewTile(review: r)).toList());
           },
         ),
       ],
@@ -136,8 +168,11 @@ class _ProfileHeader extends ConsumerWidget {
   }
 }
 
-final _reviewsProvider = StreamProvider.family<List<Review>, String>((ref, musicianId) {
-  return ref.watch(firestoreServiceProvider).watchReviewsForMusician(musicianId);
+final _reviewsProvider =
+    StreamProvider.family<List<Review>, String>((ref, musicianId) {
+  return ref
+      .watch(firestoreServiceProvider)
+      .watchReviewsForMusician(musicianId);
 });
 
 class _ReviewTile extends StatelessWidget {
@@ -174,10 +209,12 @@ class _VideoLinkCard extends StatelessWidget {
     final url = 'https://www.youtube.com/watch?v=$youtubeId';
     return Card(
       child: ListTile(
-        leading: const Icon(Icons.play_circle_fill_rounded, color: AppColors.primary, size: 36),
+        leading: const Icon(Icons.play_circle_fill_rounded,
+            color: AppColors.primary, size: 36),
         title: const Text('Watch performance'),
         subtitle: const Text('Opens on YouTube'),
-        onTap: () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
+        onTap: () =>
+            launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication),
       ),
     );
   }
@@ -190,13 +227,16 @@ class _BookingSidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isLoggedIn = FirebaseAuth.instance.currentUser != null;
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Ready to book?', style: Theme.of(context).textTheme.titleMedium),
+            Text('Ready to book?',
+                style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
             const Text(
               'Send a booking request with your event details and this musician will respond directly.',
@@ -204,12 +244,33 @@ class _BookingSidebar extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: isOrganizer ? () => context.go('/bookings/create/$musicianId') : null,
+              onPressed: () {
+                if (!isLoggedIn) {
+                  // Redirect to login with current page as return URL
+                  final currentUri = Uri.base.toString();
+                  context
+                      .go('/login?redirect=${Uri.encodeComponent(currentUri)}');
+                  return;
+                }
+                if (isOrganizer) {
+                  context.go('/bookings/create/$musicianId');
+                }
+                // If logged in but not organizer, the button remains disabled (but we don't reach here)
+              },
               child: const Text('Request Booking'),
             ),
-            if (!isOrganizer) ...[
+            if (!isLoggedIn) ...[
               const SizedBox(height: 8),
-              const Text('Only organizer accounts can send booking requests.', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+              const Text(
+                'Please log in as an organizer to book.',
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              ),
+            ] else if (!isOrganizer) ...[
+              const SizedBox(height: 8),
+              const Text(
+                'Only organizer accounts can send booking requests.',
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              ),
             ],
           ],
         ),

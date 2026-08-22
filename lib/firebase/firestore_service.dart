@@ -151,6 +151,7 @@ class FirestoreService {
       query = query.where('skills', arrayContains: skill);
     }
     if (location != null && location.isNotEmpty) {
+      location = location.trim().toLowerCase(); // ✅ added this line
       query = query
           .orderBy('location')
           .startAt([location]).endAt(['$location\uf8ff']);
