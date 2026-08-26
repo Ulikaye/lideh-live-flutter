@@ -1,21 +1,17 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-/// Stored at message_threads/{uid}/messages/{autoId}. One thread per
-/// musician/organizer (uid == the thread doc's own id), any admin can
-/// read/reply to any thread — matches how E-Card requests, blog, and
-/// events are all "any admin can moderate," not assigned per-admin.
+/// Stored either in message_threads/{uid}/messages/{autoId} (admin-user)
+/// or in bookings/{bookingId}/messages/{autoId} (musician-organizer).
+/// The same model is used for both contexts; senderRole indicates
+/// 'admin', 'musician', or 'organizer'.
 class ChatMessage {
   final String id;
   final String senderId;
-  final String senderRole; // 'admin' or 'user'
+  final String senderRole;
   final String text;
-
-  /// Admin-only, one-way — the spec here is deliberately simple
-  /// ("just a reply, or a like"), not a full reaction system. Only an
-  /// admin can ever set this, enforced by the same field-lock pattern
-  /// already used for disabled/verified elsewhere.
   final bool liked;
-
+  final bool deleted; // soft delete flag
+  final DateTime? deletedAt;
   final DateTime? createdAt;
 
   const ChatMessage({
@@ -24,6 +20,8 @@ class ChatMessage {
     required this.senderRole,
     required this.text,
     this.liked = false,
+    this.deleted = false,
+    this.deletedAt,
     this.createdAt,
   });
 
@@ -36,6 +34,8 @@ class ChatMessage {
       senderRole: map['sender_role'] ?? 'user',
       text: map['text'] ?? '',
       liked: map['liked'] ?? false,
+      deleted: map['deleted'] ?? false,
+      deletedAt: (map['deleted_at'] as Timestamp?)?.toDate(),
       createdAt: (map['created_at'] as Timestamp?)?.toDate(),
     );
   }
@@ -46,7 +46,22 @@ class ChatMessage {
       'sender_role': senderRole,
       'text': text,
       'liked': liked,
+      'deleted': deleted,
+      'deleted_at': deletedAt != null ? Timestamp.fromDate(deletedAt!) : null,
       'created_at': FieldValue.serverTimestamp(),
     };
+  }
+
+  ChatMessage copyWith({bool? deleted, DateTime? deletedAt}) {
+    return ChatMessage(
+      id: id,
+      senderId: senderId,
+      senderRole: senderRole,
+      text: text,
+      liked: liked,
+      deleted: deleted ?? this.deleted,
+      deletedAt: deletedAt ?? this.deletedAt,
+      createdAt: createdAt,
+    );
   }
 }

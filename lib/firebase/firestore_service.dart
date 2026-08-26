@@ -16,10 +16,7 @@ import '../models/ecard_template.dart';
 import '../models/chat_message.dart';
 import '../models/message_thread.dart';
 
-/// Single point of access to Cloud Firestore. Screens/providers never
-/// talk to `FirebaseFirestore.instance` directly — everything routes
-/// through here so query shape and security assumptions live in one
-/// place, keeping reads efficient and consistent with firestore.rules.
+/// Single point of access to Cloud Firestore.
 class FirestoreService {
   final FirebaseFirestore _db;
 
@@ -43,11 +40,6 @@ class FirestoreService {
   }
 
   // ---------------- Admin: user moderation ----------------
-  // See firestore.rules — isAdmin() may only ever change the
-  // `disabled` field on another user's document, enforced server-side
-  // via affectedKeys().hasOnly(['disabled']). These methods send
-  // exactly that and nothing else, matching the rule precisely.
-
   Stream<List<UserProfile>> watchAllUsersForAdmin({int limit = 200}) {
     return _db
         .collection(AppStrings.usersCollection)
@@ -58,11 +50,6 @@ class FirestoreService {
             snap.docs.map((d) => UserProfile.fromMap(d.id, d.data())).toList());
   }
 
-  /// Toggles account access. Reversible — this is the everyday
-  /// moderation action. Mirrors onto musicians/{uid} too (in the same
-  /// batch) when the account is a musician, since the public
-  /// directory query filters on that collection's own `disabled`
-  /// field, not users/.
   Future<void> setUserDisabled(String uid, bool disabled,
       {required UserType userType}) async {
     final batch = _db.batch();
@@ -75,13 +62,6 @@ class FirestoreService {
     await batch.commit();
   }
 
-  /// Admin verification gate: a musician stays out of the public
-  /// directory, and an organizer cannot create events, until this is
-  /// flipped to true. See the doc comments on UserProfile.verified and
-  /// Musician.verified for the full reasoning. Mirrors
-  /// setUserDisabled's exact batch-write shape — same two-collection
-  /// sync requirement, same reason (the public/gated query needs the
-  /// field on the document it's actually querying, not a join).
   Future<void> setUserVerified(String uid, bool verified,
       {required UserType userType}) async {
     final batch = _db.batch();
@@ -94,14 +74,6 @@ class FirestoreService {
     await batch.commit();
   }
 
-  /// Removes the Firestore profile (and role-specific doc) for an
-  /// account. Rare, admin-only. IMPORTANT: this does not and cannot
-  /// delete the underlying Firebase Auth credential — only the Admin
-  /// SDK (a Cloud Function) can remove someone else's Auth account.
-  /// The result is a fully non-functional account (no dashboard, not
-  /// listed anywhere, every screen that reads their profile gets
-  /// null) even though the bare login technically still exists until
-  /// that Cloud Function is deployed.
   Future<void> deleteUserAccount(String uid,
       {required UserType userType}) async {
     final batch = _db.batch();
@@ -137,12 +109,6 @@ class FirestoreService {
     return Musician.fromMap(uid, doc.data()!);
   }
 
-  /// Discovery query. Firestore can't do case-insensitive "contains"
-  /// search server-side, so location filtering is done with a
-  /// range-prefix query and skill filtering with `array-contains`,
-  /// then any free-text refinement happens client-side on the (small)
-  /// result page — this keeps reads bounded instead of scanning
-  /// everything.
   Stream<List<Musician>> watchMusicians(
       {String? location, String? skill, int limit = 50}) {
     Query<Map<String, dynamic>> query =
@@ -151,7 +117,7 @@ class FirestoreService {
       query = query.where('skills', arrayContains: skill);
     }
     if (location != null && location.isNotEmpty) {
-      location = location.trim().toLowerCase(); // ✅ added this line
+      location = location.trim().toLowerCase();
       query = query
           .orderBy('location')
           .startAt([location]).endAt(['$location\uf8ff']);
@@ -160,19 +126,7 @@ class FirestoreService {
     }
     return query.limit(limit).snapshots().map((snap) => snap.docs
         .map((d) => Musician.fromMap(d.id, d.data()))
-        // Client-side, not a query filter: a server-side
-        // where('disabled', isEqualTo: false) would silently exclude
-        // every existing musician doc that predates this field
-        // (Firestore equality queries don't match a missing field),
-        // which would empty the whole directory on a live app until
-        // every doc was backfilled. This filters after the fact
-        // instead — correct immediately, no migration required.
         .where((m) => !m.disabled)
-        // Same reasoning for verified: an unverified musician (the
-        // default for every new registration) stays out of public
-        // discovery until an admin approves them, but this is a
-        // client-side filter, not a query .where(), for the same
-        // missing-field-safety reason as disabled above.
         .where((m) => m.verified)
         .toList());
   }
@@ -186,7 +140,7 @@ class FirestoreService {
         .map((snap) => snap.docs
             .map((d) => Musician.fromMap(d.id, d.data()))
             .where((m) => !m.disabled)
-            .where((m) => m.verified) // ✅ FIX: filter out unverified musicians
+            .where((m) => m.verified)
             .toList());
   }
 
@@ -259,6 +213,117 @@ class FirestoreService {
             snap.docs.map((d) => Booking.fromMap(d.id, d.data())).toList());
   }
 
+  // ---------------- Booking Messages (new) ----------------
+  /// Sends a message within a booking and updates the booking's thread summary.
+  Future<void> sendBookingMessage({
+    required String bookingId,
+    required String text,
+    required String senderId,
+    required String senderRole, // 'musician', 'organizer', or 'admin'
+    required String userDisplayName,
+    required String userType,
+  }) async {
+    final bookingRef =
+        _db.collection(AppStrings.bookingsCollection).doc(bookingId);
+    final messageRef = bookingRef.collection('messages').doc();
+
+    final batch = _db.batch();
+    batch.set(
+        messageRef,
+        ChatMessage(
+          id: '',
+          senderId: senderId,
+          senderRole: senderRole,
+          text: text,
+        ).toMap());
+
+    final bookingSnap = await bookingRef.get();
+    if (!bookingSnap.exists) throw Exception('Booking not found');
+    final data = bookingSnap.data()!;
+    final musicianId = data['musician_id'];
+    final organizerId = data['organizer_id'];
+
+    final unreadByMusician = senderRole != 'musician';
+    final unreadByOrganizer = senderRole != 'organizer';
+
+    batch.update(bookingRef, {
+      'last_message': text,
+      'last_message_at': FieldValue.serverTimestamp(),
+      'last_sender_role': senderRole,
+      'unread_by_musician': unreadByMusician,
+      'unread_by_organizer': unreadByOrganizer,
+    });
+
+    await batch.commit();
+  }
+
+  /// Watches messages for a specific booking (excludes deleted ones).
+  Stream<List<ChatMessage>> watchBookingMessages(String bookingId) {
+    return _db
+        .collection(AppStrings.bookingsCollection)
+        .doc(bookingId)
+        .collection('messages')
+        .orderBy('created_at', descending: false)
+        .snapshots()
+        .map((snap) => snap.docs
+            .map((d) => ChatMessage.fromMap(d.id, d.data()))
+            .where((m) => !m.deleted)
+            .toList());
+  }
+
+  /// Soft-delete a message: only sender or admin can delete.
+  Future<void> deleteBookingMessage({
+    required String bookingId,
+    required String messageId,
+    required String currentUserId,
+    required String currentUserRole,
+  }) async {
+    final messageRef = _db
+        .collection(AppStrings.bookingsCollection)
+        .doc(bookingId)
+        .collection('messages')
+        .doc(messageId);
+
+    final snap = await messageRef.get();
+    if (!snap.exists) throw Exception('Message not found');
+    final data = snap.data()!;
+
+    final senderId = data['sender_id'];
+    final isSender = senderId == currentUserId;
+    final isAdmin = currentUserRole == 'admin';
+    if (!isSender && !isAdmin) {
+      throw Exception('Unauthorized to delete this message');
+    }
+
+    await messageRef.update({
+      'deleted': true,
+      'deleted_at': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// Stream the booking thread summary (last message, unread counts).
+  Stream<Map<String, dynamic>?> watchBookingThreadSummary(String bookingId) {
+    return _db
+        .collection(AppStrings.bookingsCollection)
+        .doc(bookingId)
+        .snapshots()
+        .map((doc) => doc.exists ? doc.data() : null);
+  }
+
+  /// Toggle the "liked" status of a booking message (admin only).
+  Future<void> toggleBookingMessageLike({
+    required String bookingId,
+    required String messageId,
+    required bool liked,
+  }) async {
+    final messageRef = _db
+        .collection(AppStrings.bookingsCollection)
+        .doc(bookingId)
+        .collection('messages')
+        .doc(messageId);
+    await messageRef.update({'liked': liked});
+  }
+
   // ---------------- Reviews ----------------
   Future<void> submitReview(Review review) async {
     final batch = _db.batch();
@@ -269,7 +334,6 @@ class FirestoreService {
         _db.collection(AppStrings.bookingsCollection).doc(review.bookingId);
     batch.update(bookingRef, {'review_submitted': true});
     await batch.commit();
-    // Recompute the musician's aggregate rating from all their reviews.
     await _recomputeMusicianRating(review.musicianId);
   }
 
@@ -319,13 +383,6 @@ class FirestoreService {
         .snapshots()
         .map((snap) => snap.docs
             .map((d) => Event.fromMap(d.id, d.data()))
-            // Client-side, not a query filter -- same reasoning as
-            // Musician.disabled: a where('is_published', isEqualTo:
-            // true) would exclude every event that predates this
-            // field (Firestore equality doesn't match a missing
-            // field), silently emptying the public listing until a
-            // backfill ran. Filtering after the fact needs no
-            // migration and is correct immediately.
             .where((e) => e.isPublished)
             .toList());
   }
@@ -348,13 +405,6 @@ class FirestoreService {
             snap.docs.map((d) => Event.fromMap(d.id, d.data())).toList());
   }
 
-  /// Toggles an event's visibility in the public listing. Reuses the
-  /// existing is_cancelled field (already filtered out of
-  /// watchUpcomingEvents) rather than introducing a second, redundant
-  /// status field — "unpublish" and "cancel" are the same action from
-  /// the data's point of view: hide this event from public view.
-  /// Available to the organizer on their own event, or to an admin
-  /// moderating any event (see the matching rule in firestore.rules).
   Future<void> setEventCancelled(String eventId, bool cancelled) {
     return _db
         .collection(AppStrings.eventsCollection)
@@ -366,10 +416,6 @@ class FirestoreService {
     return _db.collection(AppStrings.eventsCollection).doc(eventId).delete();
   }
 
-  /// Unfiltered — unlike watchUpcomingEvents (which hides cancelled
-  /// events and past dates), admin moderation needs to see everything,
-  /// including already-unpublished events, to be able to republish
-  /// them if a takedown was a mistake.
   Stream<List<Event>> watchAllEventsForAdmin({int limit = 200}) {
     return _db
         .collection(AppStrings.eventsCollection)
@@ -388,10 +434,6 @@ class FirestoreService {
   }
 
   // ---------------- E-Card Requests ----------------
-  // Admin-approval gate for creating an E-Card for a specific event.
-  // See firestore.rules — an organizer can only create their own
-  // request as 'pending', only an admin can resolve it.
-
   CollectionReference<Map<String, dynamic>> get _ecardRequestsRef =>
       _db.collection(AppStrings.ecardRequestsCollection);
 
@@ -403,9 +445,6 @@ class FirestoreService {
     return ref.id;
   }
 
-  /// The latest request for this (organizer, event) pair — a
-  /// rejected request can be followed by a new one, so this always
-  /// reflects the most recent attempt, not the full history.
   Stream<EcardRequest?> watchLatestEcardRequestForEvent(
       String organizerId, String eventId) {
     return _ecardRequestsRef
@@ -419,9 +458,6 @@ class FirestoreService {
             : EcardRequest.fromMap(snap.docs.first.id, snap.docs.first.data()));
   }
 
-  /// Admin's live badge count — this is the mechanism that stands in
-  /// for a notification here (see EcardRequest's doc comment for why
-  /// this isn't using the notifications/ collection).
   Stream<int> watchPendingEcardRequestCount() {
     return _ecardRequestsRef
         .where('status', isEqualTo: 'pending')
@@ -487,10 +523,6 @@ class FirestoreService {
         .map((doc) => doc.exists ? BlogPost.fromMap(id, doc.data()!) : null);
   }
 
-  // ---------------- Blog admin ----------------
-  /// Unfiltered — includes drafts — for the admin post list. Regular
-  /// readers only ever see [watchBlogPosts], which filters to
-  /// `is_published: true`.
   Stream<List<BlogPost>> watchAllBlogPostsForAdmin({int limit = 100}) {
     return _db
         .collection(AppStrings.blogPostsCollection)
@@ -518,12 +550,7 @@ class FirestoreService {
     return _db.collection(AppStrings.blogPostsCollection).doc(id).delete();
   }
 
-  // ---------------- E-Cards (Phase 2 — additive) ----------------
-  // Same gateway, same conventions as the sections above: collection
-  // names from AppStrings, snake_case Firestore fields, models own
-  // fromMap/toMap. ecards/{id} references events/{eventId} by id — the
-  // existing Event model and its methods above are untouched.
-
+  // ---------------- E-Cards (Phase 2) ----------------
   CollectionReference<Map<String, dynamic>> _guestsRef(String ecardId) {
     return _db
         .collection(AppStrings.ecardsCollection)
@@ -555,19 +582,6 @@ class FirestoreService {
             snap.docs.map((d) => Ecard.fromMap(d.id, d.data())).toList());
   }
 
-  /// One E-Card per event is the expected UI flow (see the "Create an
-  /// E-Card for this event?" prompt), but this isn't enforced at the
-  /// data layer — kept as a query rather than a doc-id-by-eventId
-  /// scheme so nothing here has to change if that changes later.
-  ///
-  /// Filters by organizer_id as well as event_id — not for the data
-  /// (event_id alone is already unique enough), but because Firestore
-  /// rules can only allow a *collection query* if the query itself
-  /// provably satisfies the rule for every possible match. The rule
-  /// checks resource.data.organizer_id == request.auth.uid, so without
-  /// this filter present in the query, Firestore rejects the whole
-  /// query with permission-denied even though every real result would
-  /// individually pass the check.
   Stream<Ecard?> watchEcardForEvent(String eventId, String organizerId) {
     return _db
         .collection(AppStrings.ecardsCollection)
@@ -587,10 +601,6 @@ class FirestoreService {
     });
   }
 
-  /// Organizer's own opt-in choice — see Ecard.visibility doc comment.
-  /// Also callable by an admin (same firestore.rules branch used for
-  /// updateEcardFields above), used for moderation — see
-  /// watchAllEcardsForAdmin.
   Future<void> updateEcardVisibility(String ecardId, String visibility) {
     return _db.collection(AppStrings.ecardsCollection).doc(ecardId).update({
       'visibility': visibility,
@@ -598,10 +608,6 @@ class FirestoreService {
     });
   }
 
-  /// Public E-Cards page (/e-cards/public) — anyone, signed in or
-  /// not. The query's own equality filter is what lets
-  /// firestore.rules authorize this as a list operation (see the
-  /// rules file's E-Cards section comment).
   Stream<List<Ecard>> watchPublicEcards({int limit = 50}) {
     return _db
         .collection(AppStrings.ecardsCollection)
@@ -613,9 +619,6 @@ class FirestoreService {
             snap.docs.map((d) => Ecard.fromMap(d.id, d.data())).toList());
   }
 
-  /// Admin moderation view — every E-Card regardless of owner or
-  /// visibility. Requires isAdmin() server-side (see rules); calling
-  /// this as a non-admin simply gets a permission-denied stream error.
   Stream<List<Ecard>> watchAllEcardsForAdmin({int limit = 200}) {
     return _db
         .collection(AppStrings.ecardsCollection)
@@ -627,15 +630,8 @@ class FirestoreService {
   }
 
   Future<void> deleteEcard(String ecardId) {
-    // Note: does not cascade-delete the guests/ subcollection — that
-    // requires either a small Cloud Function or a batched client-side
-    // delete of the subcollection before removing the parent doc.
-    // Flagged here rather than silently left out; worth a decision in
-    // Phase 3 rather than guessed at in the data layer.
     return _db.collection(AppStrings.ecardsCollection).doc(ecardId).delete();
   }
-
-  // ---- E-Card templates (admin/seed-managed, public read) ----
 
   Stream<List<EcardTemplate>> watchEcardTemplates({EcardOccasion? occasion}) {
     Query<Map<String, dynamic>> query = _db
@@ -648,27 +644,16 @@ class FirestoreService {
         snap.docs.map((d) => EcardTemplate.fromMap(d.id, d.data())).toList());
   }
 
-  // ---- E-Card guests ----
-
   Stream<List<EcardGuest>> watchGuestsForEcard(String ecardId) {
     return _guestsRef(ecardId).orderBy('created_at').snapshots().map((snap) =>
         snap.docs.map((d) => EcardGuest.fromMap(d.id, d.data())).toList());
   }
 
-  /// Single-guest watch for the guest card/QR view (Phase 6) — avoids
-  /// loading the whole guest list just to show one invitation.
   Stream<EcardGuest?> watchEcardGuest(String ecardId, String guestId) {
     return _guestsRef(ecardId).doc(guestId).snapshots().map(
         (doc) => doc.exists ? EcardGuest.fromMap(doc.id, doc.data()!) : null);
   }
 
-  /// Adds a guest and mints its human-readable display id (e.g.
-  /// "WD-0001") from a counter scoped to THIS card only — inside a
-  /// transaction, so concurrent adds from the same organizer on two
-  /// devices can't collide. This replaces Harusi Cards'
-  /// meta/counter, which was a single global document shared by every
-  /// wedding (see Phase 1 doc, §3) — that scheme would leak sequence
-  /// numbers across unrelated organizers' events if reused as-is.
   Future<EcardGuest> addEcardGuest({
     required String ecardId,
     required EcardOccasion occasion,
@@ -711,12 +696,6 @@ class FirestoreService {
     return _guestsRef(ecardId).doc(guestId).delete();
   }
 
-  /// Checks a guest in inside a transaction — read-and-verify-then-
-  /// write in one atomic step, unlike the original ScanGateFragment's
-  /// separate getContributor()-then-updateContributor() calls (see
-  /// Phase 1 doc §2). Throws [AlreadyCheckedInException] if the guest
-  /// was already checked in, so the scan screen can show the original
-  /// check-in time instead of silently double-counting attendance.
   Future<void> checkInEcardGuest(String ecardId, String guestId) async {
     final guestRef = _guestsRef(ecardId).doc(guestId);
     await _db.runTransaction((tx) async {
@@ -735,13 +714,8 @@ class FirestoreService {
       });
     });
   }
-  // ---------------- Messages (admin <-> musician/organizer) ----------------
-  // One thread per user, doc id == their own uid — same "keyed
-  // directly by uid" pattern as users/musicians/organizers, so
-  // finding "my thread" or "this user's thread" is always a direct
-  // doc lookup, never a query filter that could hit the same
-  // rules-vs-query mismatch we've fixed elsewhere in this project.
 
+  // ---------------- Messages (admin <-> musician/organizer) ----------------
   Stream<MessageThread?> watchMessageThread(String uid) {
     return _db
         .collection(AppStrings.messageThreadsCollection)
@@ -762,9 +736,6 @@ class FirestoreService {
             snap.docs.map((d) => ChatMessage.fromMap(d.id, d.data())).toList());
   }
 
-  /// Sends a message and updates the parent thread's summary in one
-  /// batch — both writes succeed or fail together, so the thread list
-  /// preview can never drift out of sync with the actual last message.
   Future<void> sendMessage({
     required String uid,
     required String text,
@@ -791,8 +762,6 @@ class FirestoreService {
         userType: userType,
         lastMessage: text,
         lastSenderRole: senderRole,
-        // The party who didn't just send it has something new to read;
-        // the sender's own unread flag clears since they're caught up.
         unreadByAdmin: senderRole == 'user',
         unreadByUser: senderRole == 'admin',
       ).toMap(),
@@ -825,4 +794,9 @@ class FirestoreService {
             .map((d) => MessageThread.fromMap(d.id, d.data()))
             .toList());
   }
+}
+
+class AlreadyCheckedInException implements Exception {
+  final DateTime? checkedInAt;
+  AlreadyCheckedInException(this.checkedInAt);
 }

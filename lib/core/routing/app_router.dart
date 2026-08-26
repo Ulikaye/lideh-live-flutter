@@ -15,6 +15,7 @@ import '../../features/musicians/musician_profile_screen.dart';
 import '../../features/bookings/create_booking_screen.dart';
 import '../../features/bookings/booking_detail_screen.dart';
 import '../../features/bookings/my_bookings_screen.dart';
+import '../../features/bookings/booking_chat_screen.dart';
 import '../../features/events/event_list_screen.dart';
 import '../../features/events/event_detail_screen.dart';
 import '../../features/events/create_event_screen.dart';
@@ -91,7 +92,6 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       debugPrint('🔁 Redirect: path="$path", isLoggedIn=$isLoggedIn');
 
-      // 🚀 FORCE allow /profile-setup when logged in
       if (path == '/profile-setup') {
         if (isLoggedIn) {
           debugPrint('✅ Allowing /profile-setup');
@@ -102,18 +102,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         }
       }
 
-      // 📌 REMOVED: the redirect that sent logged-in users away from /register.
-      // if (isLoggedIn && (path == '/login' || path == '/register')) {
-      //   return '/';
-      // }
-
-      // If not logged in and path is not public, go to login
       if (!isLoggedIn && !_isPublic(path)) {
         debugPrint('🔒 Not logged in, public? false -> redirect to login');
         return '/login?redirect=${Uri.encodeComponent(path)}';
       }
 
-      // If logged in, check for deactivated account
       if (isLoggedIn && path != '/account-deactivated') {
         final profile = ref.read(currentUserProfileProvider).value;
         if (profile?.disabled == true) {
@@ -122,7 +115,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         }
       }
 
-      // Admin routes check
       if (path.startsWith('/admin')) {
         final profile = ref.read(currentUserProfileProvider).value;
         if (profile?.userType != UserType.admin) {
@@ -275,6 +267,13 @@ final routerProvider = Provider<GoRouter>((ref) {
             pageBuilder: (_, s) => slideTransitionPage(
                 state: s,
                 child: BookingDetailScreen(bookingId: s.pathParameters['id']!)),
+          ),
+          // 🆕 Chat route for a booking
+          GoRoute(
+            path: '/bookings/:id/chat',
+            pageBuilder: (_, s) => slideTransitionPage(
+                state: s,
+                child: BookingChatScreen(bookingId: s.pathParameters['id']!)),
           ),
           GoRoute(path: '/profile', builder: (_, __) => const ProfileScreen()),
           GoRoute(
