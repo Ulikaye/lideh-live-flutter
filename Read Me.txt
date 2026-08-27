@@ -1,0 +1,8 @@
+flutter build web --release
+git add .
+git commit -m "organizers to musician message chat"
+git push
+
+
+
+Here is a list of some errors or bugs which I've observed or identified in the process of testing my web application. The first one: an organizer can make a booking, can book a musician, and still admin won't notice it. So there is no process to trigger when a booking process has been made. So that is logical, but also mechanism which I should put there. A booking, when it is made, an admin should see it and should know also when a booking is complete. Another thing is still the error of failing to upload pictures in electronic cards, especially for a wedding, still exists. So we have to fix that also. Another one is to add a feature of pinning blog posts or events that are posted by organizers. That is it for now. But the last one... okay, that is it for now.

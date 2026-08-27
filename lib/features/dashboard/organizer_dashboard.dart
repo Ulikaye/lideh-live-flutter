@@ -21,8 +21,10 @@ class OrganizerDashboard extends ConsumerStatefulWidget {
   ConsumerState<OrganizerDashboard> createState() => _OrganizerDashboardState();
 }
 
-class _OrganizerDashboardState extends ConsumerState<OrganizerDashboard> with SingleTickerProviderStateMixin {
-  late final TabController _tabController = TabController(length: 2, vsync: this);
+class _OrganizerDashboardState extends ConsumerState<OrganizerDashboard>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabController =
+      TabController(length: 2, vsync: this);
 
   @override
   void dispose() {
@@ -35,12 +37,21 @@ class _OrganizerDashboardState extends ConsumerState<OrganizerDashboard> with Si
     final profile = ref.watch(currentUserProfileProvider).value;
     if (profile == null) return const LoadingIndicator();
 
+    // ✅ Use .name to compare strings – avoids needing UserType enum import
+    final isAdmin = profile.userType.name == 'admin';
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Organizer Dashboard'),
-        bottom: TabBar(controller: _tabController, tabs: const [Tab(text: 'My Bookings'), Tab(text: 'My Events')]),
+        title: Text(isAdmin ? 'Admin Dashboard' : 'Organizer Dashboard'),
+        bottom: TabBar(
+            controller: _tabController,
+            tabs: const [Tab(text: 'My Bookings'), Tab(text: 'My Events')]),
         actions: [
-          IconButton(icon: const Icon(Icons.add_circle_outline), tooltip: 'New Event', onPressed: () => context.go('/events/create')),
+          if (!isAdmin)
+            IconButton(
+                icon: const Icon(Icons.add_circle_outline),
+                tooltip: 'New Event',
+                onPressed: () => context.go('/events/create')),
           const NotificationBellButton(),
           const ProfileMenuButton(),
           const SizedBox(width: 8),
@@ -48,7 +59,8 @@ class _OrganizerDashboardState extends ConsumerState<OrganizerDashboard> with Si
       ),
       body: Column(
         children: [
-          _ServicesRow(onEventsTap: () => _tabController.animateTo(1)),
+          _ServicesRow(
+              isAdmin: isAdmin, onEventsTap: () => _tabController.animateTo(1)),
           Expanded(
             child: TabBarView(
               controller: _tabController,
@@ -64,14 +76,10 @@ class _OrganizerDashboardState extends ConsumerState<OrganizerDashboard> with Si
   }
 }
 
-/// Services row (Musician Booking / Events / E-Cards), added above the
-/// existing My Bookings / My Events tabs — additive only, the
-/// TabController and its two tabs are untouched. "Events" jumps to the
-/// My Events tab already on this screen; "Musician Booking" goes to
-/// discovery; "E-Cards" is the new service.
 class _ServicesRow extends StatelessWidget {
+  final bool isAdmin;
   final VoidCallback onEventsTap;
-  const _ServicesRow({required this.onEventsTap});
+  const _ServicesRow({required this.isAdmin, required this.onEventsTap});
 
   @override
   Widget build(BuildContext context) {
@@ -88,7 +96,10 @@ class _ServicesRow extends StatelessWidget {
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: _ServiceTile(icon: Icons.event_outlined, label: 'Events', onTap: onEventsTap),
+            child: _ServiceTile(
+                icon: Icons.event_outlined,
+                label: 'Events',
+                onTap: onEventsTap),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -98,6 +109,16 @@ class _ServicesRow extends StatelessWidget {
               onTap: () => context.go('/e-cards'),
             ),
           ),
+          if (isAdmin) ...[
+            const SizedBox(width: 12),
+            Expanded(
+              child: _ServiceTile(
+                icon: Icons.notifications_active_outlined,
+                label: 'Booking Notifications',
+                onTap: () => context.go('/admin/booking-notifications'),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -108,7 +129,8 @@ class _ServiceTile extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback onTap;
-  const _ServiceTile({required this.icon, required this.label, required this.onTap});
+  const _ServiceTile(
+      {required this.icon, required this.label, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -122,7 +144,10 @@ class _ServiceTile extends StatelessWidget {
             children: [
               Icon(icon, color: AppColors.primary),
               const SizedBox(height: 6),
-              Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+              Text(label,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w600)),
             ],
           ),
         ),
@@ -143,7 +168,10 @@ class _BookingsTab extends ConsumerWidget {
       error: (e, _) => AppErrorWidget(message: 'Could not load bookings'),
       data: (bookings) {
         if (bookings.isEmpty) {
-          return const EmptyStateWidget(title: 'No bookings yet', subtitle: 'Requests you send will show up here', icon: Icons.event_note_outlined);
+          return const EmptyStateWidget(
+              title: 'No bookings yet',
+              subtitle: 'Requests you send will show up here',
+              icon: Icons.event_note_outlined);
         }
         return Center(
           child: ConstrainedBox(
@@ -173,7 +201,10 @@ class _EventsTab extends ConsumerWidget {
       error: (e, _) => AppErrorWidget(message: 'Could not load events'),
       data: (events) {
         if (events.isEmpty) {
-          return const EmptyStateWidget(title: 'No events yet', subtitle: 'Publish your first event to get started', icon: Icons.event_outlined);
+          return const EmptyStateWidget(
+              title: 'No events yet',
+              subtitle: 'Publish your first event to get started',
+              icon: Icons.event_outlined);
         }
         return Center(
           child: ConstrainedBox(
@@ -195,18 +226,24 @@ class _EventsTab extends ConsumerWidget {
                         if (event.isCancelled)
                           const Padding(
                             padding: EdgeInsets.only(right: 4),
-                            child: Chip(label: Text('Unpublished'), backgroundColor: Color(0x1AE74C3C)),
+                            child: Chip(
+                                label: Text('Unpublished'),
+                                backgroundColor: Color(0x1AE74C3C)),
                           ),
                         PopupMenuButton<String>(
-                          onSelected: (value) => _handleEventAction(context, ref, event, value),
+                          onSelected: (value) =>
+                              _handleEventAction(context, ref, event, value),
                           itemBuilder: (context) => [
                             PopupMenuItem(
                               value: 'toggle',
-                              child: Text(event.isCancelled ? 'Republish' : 'Unpublish'),
+                              child: Text(event.isCancelled
+                                  ? 'Republish'
+                                  : 'Unpublish'),
                             ),
                             const PopupMenuItem(
                               value: 'delete',
-                              child: Text('Delete', style: TextStyle(color: AppColors.danger)),
+                              child: Text('Delete',
+                                  style: TextStyle(color: AppColors.danger)),
                             ),
                           ],
                         ),
@@ -222,7 +259,8 @@ class _EventsTab extends ConsumerWidget {
     );
   }
 
-  Future<void> _handleEventAction(BuildContext context, WidgetRef ref, dynamic event, String action) async {
+  Future<void> _handleEventAction(
+      BuildContext context, WidgetRef ref, dynamic event, String action) async {
     final service = ref.read(firestoreServiceProvider);
 
     if (action == 'toggle') {
@@ -230,13 +268,18 @@ class _EventsTab extends ConsumerWidget {
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: Text(unpublishing ? 'Unpublish this event?' : 'Republish this event?'),
+          title: Text(
+              unpublishing ? 'Unpublish this event?' : 'Republish this event?'),
           content: Text(unpublishing
               ? 'It will be hidden from the public Events listing immediately. You can republish it any time.'
               : 'It will reappear in the public Events listing immediately.'),
           actions: [
-            TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
-            TextButton(onPressed: () => Navigator.of(context).pop(true), child: Text(unpublishing ? 'Unpublish' : 'Republish')),
+            TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancel')),
+            TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: Text(unpublishing ? 'Unpublish' : 'Republish')),
           ],
         ),
       );
@@ -251,12 +294,16 @@ class _EventsTab extends ConsumerWidget {
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('Delete this event?'),
-          content: const Text('This permanently removes the event. This cannot be undone.'),
+          content: const Text(
+              'This permanently removes the event. This cannot be undone.'),
           actions: [
-            TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
+            TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancel')),
             TextButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Delete', style: TextStyle(color: AppColors.danger)),
+              child: const Text('Delete',
+                  style: TextStyle(color: AppColors.danger)),
             ),
           ],
         ),

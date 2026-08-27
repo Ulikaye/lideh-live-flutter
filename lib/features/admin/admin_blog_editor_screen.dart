@@ -11,9 +11,6 @@ import '../../providers/blog_provider.dart';
 import '../../shared/widgets/loading_indicator.dart';
 import 'widgets/blog_content_block_editor.dart';
 
-/// Admin-only: create a new post, or edit an existing one (pass
-/// [postId]). Handles metadata, the featured image, the publish
-/// toggle, and the structured content-block body in one form.
 class AdminBlogEditorScreen extends ConsumerStatefulWidget {
   final String? postId;
   const AdminBlogEditorScreen({super.key, this.postId});
@@ -35,6 +32,7 @@ class _AdminBlogEditorScreenState extends ConsumerState<AdminBlogEditorScreen> {
   String? _featuredImageUrl;
   bool _uploadingFeatured = false;
   bool _isPublished = false;
+  bool _isPinned = false;
   bool _saving = false;
   bool _initialized = false;
   final List<EditableBlock> _blocks = [];
@@ -47,8 +45,12 @@ class _AdminBlogEditorScreenState extends ConsumerState<AdminBlogEditorScreen> {
     _categoryId = post.categoryId;
     _featuredImageUrl = post.featuredImageUrl;
     _isPublished = post.isPublished;
-    _blocks.addAll(post.contentBlocks.map((b) =>
-        EditableBlock(type: b.type, text: b.text, imageUrl: b.imageUrl)));
+    _isPinned = post.isPinned;
+    _blocks.addAll(post.contentBlocks.map((b) => EditableBlock(
+          type: BlockTypeExtension.fromString(b.type),
+          text: b.text,
+          imageUrl: b.imageUrl,
+        )));
     _initialized = true;
   }
 
@@ -108,6 +110,7 @@ class _AdminBlogEditorScreenState extends ConsumerState<AdminBlogEditorScreen> {
       content: '',
       contentBlocks: _blocks.map((b) => b.toBlock()).toList(),
       isPublished: _isPublished,
+      isPinned: _isPinned,
       publishedDate: DateTime.now(),
     );
 
@@ -119,9 +122,6 @@ class _AdminBlogEditorScreenState extends ConsumerState<AdminBlogEditorScreen> {
       }
       if (mounted) context.go('/admin/blog');
     } catch (e) {
-      // Previously uncaught here — a permission-denied error (or any
-      // other save failure) would just reset the spinner with the
-      // form still on screen and zero explanation of what happened.
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -222,6 +222,14 @@ class _AdminBlogEditorScreenState extends ConsumerState<AdminBlogEditorScreen> {
                       : 'Draft — only visible here'),
                   value: _isPublished,
                   onChanged: (v) => setState(() => _isPublished = v),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Pinned'),
+                  subtitle:
+                      const Text('Appears at the top of the blog listing'),
+                  value: _isPinned,
+                  onChanged: (v) => setState(() => _isPinned = v),
                 ),
                 const Divider(height: 32),
                 Text('Body', style: Theme.of(context).textTheme.titleMedium),

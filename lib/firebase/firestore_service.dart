@@ -213,7 +213,7 @@ class FirestoreService {
             snap.docs.map((d) => Booking.fromMap(d.id, d.data())).toList());
   }
 
-  // ---------------- Booking Messages (new) ----------------
+  // ---------------- Booking Messages ----------------
   /// Sends a message within a booking and updates the booking's thread summary.
   Future<void> sendBookingMessage({
     required String bookingId,
@@ -324,6 +324,45 @@ class FirestoreService {
     await messageRef.update({'liked': liked});
   }
 
+  // ---------------- Admin Booking Notifications (NEW) ----------------
+  /// Stream of unviewed bookings (adminViewed == false and deleted == false)
+  Stream<List<Booking>> watchUnviewedBookingsForAdmin() {
+    return _db
+        .collection(AppStrings.bookingsCollection)
+        .where('admin_viewed', isEqualTo: false)
+        .where('deleted', isEqualTo: false)
+        .orderBy('created_at', descending: true)
+        .snapshots()
+        .map((snap) =>
+            snap.docs.map((d) => Booking.fromMap(d.id, d.data())).toList());
+  }
+
+  /// Count of unviewed bookings for badge
+  Stream<int> watchUnviewedBookingCount() {
+    return _db
+        .collection(AppStrings.bookingsCollection)
+        .where('admin_viewed', isEqualTo: false)
+        .where('deleted', isEqualTo: false)
+        .snapshots()
+        .map((snap) => snap.docs.length);
+  }
+
+  /// Mark a booking as viewed by admin
+  Future<void> markBookingViewed(String bookingId) {
+    return _db
+        .collection(AppStrings.bookingsCollection)
+        .doc(bookingId)
+        .update({'admin_viewed': true});
+  }
+
+  /// Soft-delete a booking notification (hide from admin list)
+  Future<void> deleteBookingNotification(String bookingId) {
+    return _db
+        .collection(AppStrings.bookingsCollection)
+        .doc(bookingId)
+        .update({'deleted': true});
+  }
+
   // ---------------- Reviews ----------------
   Future<void> submitReview(Review review) async {
     final batch = _db.batch();
@@ -431,6 +470,14 @@ class FirestoreService {
         .collection(AppStrings.eventsCollection)
         .doc(eventId)
         .update({'is_published': isPublished});
+  }
+
+  /// Toggle pinned status (admin only).
+  Future<void> updateEventPinned(String eventId, bool pinned) {
+    return _db.collection(AppStrings.eventsCollection).doc(eventId).update({
+      'is_pinned': pinned,
+      'updated_at': FieldValue.serverTimestamp(),
+    });
   }
 
   // ---------------- E-Card Requests ----------------

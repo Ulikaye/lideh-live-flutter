@@ -49,6 +49,7 @@ import '../../features/static/static_pages.dart';
 import '../../shared/widgets/error_widget.dart';
 import '../../shared/widgets/loading_indicator.dart';
 import 'page_transitions.dart';
+import '../../features/admin/admin_booking_notifications_screen.dart'; // NEW
 
 final _publicRoutes = <String>{
   '/',
@@ -268,12 +269,18 @@ final routerProvider = Provider<GoRouter>((ref) {
                 state: s,
                 child: BookingDetailScreen(bookingId: s.pathParameters['id']!)),
           ),
-          // 🆕 Chat route for a booking
+          // Chat route for a booking
           GoRoute(
             path: '/bookings/:id/chat',
             pageBuilder: (_, s) => slideTransitionPage(
                 state: s,
                 child: BookingChatScreen(bookingId: s.pathParameters['id']!)),
+          ),
+          // 🆕 Admin booking notifications
+          GoRoute(
+            path: '/admin/booking-notifications',
+            pageBuilder: (_, s) => slideTransitionPage(
+                state: s, child: const AdminBookingNotificationsScreen()),
           ),
           GoRoute(path: '/profile', builder: (_, __) => const ProfileScreen()),
           GoRoute(

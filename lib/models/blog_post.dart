@@ -1,64 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-/// A single block within a post's body. Lets richer posts — ones with
-/// section headings and a photo + caption per person/item, like a
-/// "meet the team" roundup — render properly instead of collapsing
-/// everything into one plain-text field.
-enum BlogBlockType { heading, paragraph, imageText }
-
-class BlogContentBlock {
-  final BlogBlockType type;
-  final String? text;
-  final String? imageUrl;
-
-  const BlogContentBlock({required this.type, this.text, this.imageUrl});
-
-  factory BlogContentBlock.fromMap(Map<String, dynamic> map) {
-    return BlogContentBlock(
-      type: _typeFromString(map['type'] as String?),
-      text: map['text'] as String?,
-      imageUrl: map['image_url'] as String?,
-    );
-  }
-
-  Map<String, dynamic> toMap() {
-    return {
-      'type': _typeToString(type),
-      if (text != null) 'text': text,
-      if (imageUrl != null) 'image_url': imageUrl,
-    };
-  }
-
-  static BlogBlockType _typeFromString(String? value) {
-    switch (value) {
-      case 'heading':
-        return BlogBlockType.heading;
-      case 'image_text':
-        return BlogBlockType.imageText;
-      default:
-        return BlogBlockType.paragraph;
-    }
-  }
-
-  static String _typeToString(BlogBlockType type) {
-    switch (type) {
-      case BlogBlockType.heading:
-        return 'heading';
-      case BlogBlockType.imageText:
-        return 'image_text';
-      case BlogBlockType.paragraph:
-        return 'paragraph';
-    }
-  }
-}
-
-/// Stored at blogPosts/{autoId}. Mirrors Django's BlogPost model —
-/// content hub for articles, testimonials and platform news.
-///
-/// `contentBlocks` is the preferred way to author a post body (supports
-/// headings and per-item images with captions). `content` remains as a
-/// plain-text fallback for posts that don't need that structure, and is
-/// what renders if `contentBlocks` is empty.
 class BlogPost {
   final String id;
   final String title;
@@ -68,11 +9,12 @@ class BlogPost {
   final String? featuredImageUrl;
   final String? excerpt;
   final String content;
-  final List<BlogContentBlock> contentBlocks;
+  final List<ContentBlock> contentBlocks;
   final bool isPublished;
+  final bool isPinned; // NEW
   final DateTime? publishedDate;
-  final String? relatedMusicianId;
-  final String? relatedEventId;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
 
   const BlogPost({
     required this.id,
@@ -82,12 +24,13 @@ class BlogPost {
     this.categoryId,
     this.featuredImageUrl,
     this.excerpt,
-    required this.content,
+    this.content = '',
     this.contentBlocks = const [],
     this.isPublished = false,
+    this.isPinned = false, // NEW
     this.publishedDate,
-    this.relatedMusicianId,
-    this.relatedEventId,
+    this.createdAt,
+    this.updatedAt,
   });
 
   factory BlogPost.fromMap(String id, Map<String, dynamic> map) {
@@ -100,14 +43,15 @@ class BlogPost {
       featuredImageUrl: map['featured_image_url'],
       excerpt: map['excerpt'],
       content: map['content'] ?? '',
-      contentBlocks: (map['content_blocks'] as List<dynamic>?)
-              ?.map((b) => BlogContentBlock.fromMap(Map<String, dynamic>.from(b as Map)))
+      contentBlocks: (map['content_blocks'] as List?)
+              ?.map((b) => ContentBlock.fromMap(b))
               .toList() ??
           const [],
       isPublished: map['is_published'] ?? false,
+      isPinned: map['is_pinned'] ?? false, // NEW
       publishedDate: (map['published_date'] as Timestamp?)?.toDate(),
-      relatedMusicianId: map['related_musician_id'],
-      relatedEventId: map['related_event_id'],
+      createdAt: (map['created_at'] as Timestamp?)?.toDate(),
+      updatedAt: (map['updated_at'] as Timestamp?)?.toDate(),
     );
   }
 
@@ -122,9 +66,38 @@ class BlogPost {
       'content': content,
       'content_blocks': contentBlocks.map((b) => b.toMap()).toList(),
       'is_published': isPublished,
-      'published_date': publishedDate != null ? Timestamp.fromDate(publishedDate!) : FieldValue.serverTimestamp(),
-      'related_musician_id': relatedMusicianId,
-      'related_event_id': relatedEventId,
+      'is_pinned': isPinned, // NEW
+      'published_date': publishedDate != null
+          ? Timestamp.fromDate(publishedDate!)
+          : FieldValue.serverTimestamp(),
+      'created_at': createdAt != null
+          ? Timestamp.fromDate(createdAt!)
+          : FieldValue.serverTimestamp(),
+      'updated_at': FieldValue.serverTimestamp(),
+    };
+  }
+}
+
+class ContentBlock {
+  final String type; // 'paragraph', 'image', 'quote'
+  final String? text;
+  final String? imageUrl;
+
+  const ContentBlock({required this.type, this.text, this.imageUrl});
+
+  factory ContentBlock.fromMap(Map<String, dynamic> map) {
+    return ContentBlock(
+      type: map['type'] ?? 'paragraph',
+      text: map['text'],
+      imageUrl: map['image_url'],
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'type': type,
+      'text': text,
+      'image_url': imageUrl,
     };
   }
 }

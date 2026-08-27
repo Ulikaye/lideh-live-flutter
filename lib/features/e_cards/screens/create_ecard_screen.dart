@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:intl/intl.dart'; // ✅ Added for date formatting
+import 'package:intl/intl.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // ✅ added for token refresh
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/strings.dart';
 import '../../../core/utils/validators.dart';
@@ -55,7 +56,6 @@ const _fallbackFields = <EcardOccasion, List<String>>{
 
 bool _isImageField(String key) => key.endsWith('_image_url');
 
-/// ✅ New helpers to detect date/time fields
 bool _isDateField(String key) => key.toLowerCase().contains('date');
 bool _isTimeField(String key) => key.toLowerCase().contains('time');
 
@@ -70,9 +70,6 @@ String _humanize(String key) {
 }
 
 class CreateEcardScreen extends ConsumerStatefulWidget {
-  /// Pre-filled when arriving from "Create an E-Card for this event?"
-  /// on create_event_screen.dart. If null, step 0 asks the organizer
-  /// to pick one of their existing events instead.
   final String? eventId;
   const CreateEcardScreen({super.key, this.eventId});
 
@@ -91,7 +88,6 @@ class _CreateEcardScreenState extends ConsumerState<CreateEcardScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _saving = false;
 
-  // ✅ Maps to store actual ISO values for date/time while keeping display text in controllers
   final _storedDateValues = <String, String>{};
   final _storedTimeValues = <String, String>{};
 
@@ -118,7 +114,6 @@ class _CreateEcardScreenState extends ConsumerState<CreateEcardScreen> {
         if (request.isPending) {
           return const _ApprovalPendingStep();
         }
-        // approved
         if (_occasion == null) {
           return _OccasionPickerStep(
               onPicked: (o) => setState(() => _occasion = o));
@@ -162,6 +157,11 @@ class _CreateEcardScreenState extends ConsumerState<CreateEcardScreen> {
     if (picked == null) return;
     setState(() => _uploadingImage[key] = true);
     try {
+      // ✅ Refresh token to ensure auth is valid for storage upload
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        await user.getIdToken(true);
+      }
       final bytes = await picked.readAsBytes();
       final url = await ref.read(storageServiceProvider).uploadBytes(
             folder: AppStrings.ecardMediaPath,
@@ -174,7 +174,6 @@ class _CreateEcardScreenState extends ConsumerState<CreateEcardScreen> {
     }
   }
 
-  // ✅ Modified _submit to use stored ISO values for date/time fields
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     final missingImage = _activeFieldSchema
@@ -190,7 +189,6 @@ class _CreateEcardScreenState extends ConsumerState<CreateEcardScreen> {
     setState(() => _saving = true);
     final organizerId = ref.read(authServiceProvider).currentUser!.uid;
 
-    // Build fields map, using stored ISO values for date/time, controller text for others
     final fields = <String, String>{};
     for (final e in _fieldControllers.entries) {
       if (_storedDateValues.containsKey(e.key)) {
@@ -201,7 +199,6 @@ class _CreateEcardScreenState extends ConsumerState<CreateEcardScreen> {
         fields[e.key] = e.value.text.trim();
       }
     }
-    // Add image URLs
     for (final e in _imageUrls.entries) {
       fields[e.key] = e.value ?? '';
     }
@@ -246,12 +243,11 @@ class _CreateEcardScreenState extends ConsumerState<CreateEcardScreen> {
     );
   }
 
-  // ---- ✅ NEW: Date picker field ----
   Widget _buildDatePickerField(String key) {
     final controller = _fieldControllers[key]!;
     return TextFormField(
       controller: controller,
-      readOnly: true, // prevents manual typing
+      readOnly: true,
       decoration: InputDecoration(
         labelText: _humanize(key),
         suffixIcon: const Icon(Icons.calendar_today_outlined),
@@ -276,7 +272,6 @@ class _CreateEcardScreenState extends ConsumerState<CreateEcardScreen> {
     );
   }
 
-  // ---- ✅ NEW: Time picker field ----
   Widget _buildTimePickerField(String key) {
     final controller = _fieldControllers[key]!;
     return TextFormField(
@@ -295,7 +290,7 @@ class _CreateEcardScreenState extends ConsumerState<CreateEcardScreen> {
           final hour = picked.hour.toString().padLeft(2, '0');
           final minute = picked.minute.toString().padLeft(2, '0');
           final isoTime = '$hour:$minute';
-          final display = picked.format(context); // localised format
+          final display = picked.format(context);
           setState(() {
             controller.text = display;
             _storedTimeValues[key] = isoTime;
@@ -361,7 +356,7 @@ class _CreateEcardScreenState extends ConsumerState<CreateEcardScreen> {
 }
 
 // =========================================================================
-// Everything below this line is UNCHANGED from your original file.
+// All helper widgets below are unchanged from your original file.
 // =========================================================================
 
 class _ImageFieldPicker extends StatelessWidget {
@@ -471,10 +466,6 @@ class _EventPickerStep extends ConsumerWidget {
   }
 }
 
-/// Wraps an event's tile and swaps it for a warning if that event
-/// already has an E-Card — avoids silently creating a second one
-/// (there's no data-layer constraint against it; see
-/// firestore_service.dart's watchEcardForEvent doc comment).
 class _ExistingEcardGuard extends ConsumerWidget {
   final String eventId;
   final String organizerId;
@@ -504,10 +495,6 @@ class _ExistingEcardGuard extends ConsumerWidget {
 class _ApprovalGateStep extends ConsumerStatefulWidget {
   final String organizerId;
   final String eventId;
-
-  /// Set only when the most recent request for this event was
-  /// rejected — shown so the organizer knows why before sending
-  /// another one, rather than it feeling like a mystery re-block.
   final String? rejectedReply;
   const _ApprovalGateStep(
       {required this.organizerId, required this.eventId, this.rejectedReply});
@@ -640,9 +627,6 @@ class _TemplatePickerStep extends ConsumerWidget {
       error: (e, _) => AppErrorWidget(message: 'Could not load templates'),
       data: (templates) {
         if (templates.isEmpty) {
-          // Expected until Phase 4 seeds ecard_templates/ — proceed
-          // with the occasion's default field set rather than
-          // blocking the organizer.
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [

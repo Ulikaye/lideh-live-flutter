@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import '../../core/constants/app_colors.dart';
-import '../../core/utils/responsive.dart';
-import '../../models/blog_post.dart';
-import '../../providers/blog_provider.dart';
-import '../../shared/widgets/error_widget.dart';
-import '../../shared/widgets/loading_indicator.dart';
+import '../../../providers/blog_provider.dart';
+import '../../../shared/widgets/error_widget.dart';
+import '../../../shared/widgets/loading_indicator.dart';
+import '../../../models/blog_post.dart';
 
 class BlogDetailScreen extends ConsumerWidget {
   final String postId;
@@ -17,124 +14,76 @@ class BlogDetailScreen extends ConsumerWidget {
     final postAsync = ref.watch(blogPostByIdProvider(postId));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Article')),
+      appBar: AppBar(title: const Text('Blog Post')),
       body: postAsync.when(
         loading: () => const LoadingIndicator(),
-        error: (e, _) => AppErrorWidget(message: 'Could not load article'),
+        error: (e, _) => AppErrorWidget(message: 'Could not load post'),
         data: (post) {
-          if (post == null) return const EmptyStateWidget(title: 'Article not found');
+          if (post == null) {
+            return const AppErrorWidget(message: 'Post not found');
+          }
           return SingleChildScrollView(
-            child: CenteredContent(
-              padding: const EdgeInsets.all(0),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 720),
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (post.featuredImageUrl != null)
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: AspectRatio(
-                            aspectRatio: 16 / 9,
-                            child: CachedNetworkImage(imageUrl: post.featuredImageUrl!, fit: BoxFit.cover),
-                          ),
-                        ),
-                      const SizedBox(height: 20),
-                      Text(post.title, style: Theme.of(context).textTheme.headlineMedium),
-                      const SizedBox(height: 16),
-                      if (post.contentBlocks.isNotEmpty)
-                        _BlogBody(blocks: post.contentBlocks)
-                      else
-                        Text(post.content, style: const TextStyle(fontSize: 15, height: 1.6, color: AppColors.textPrimary)),
-                    ],
-                  ),
-                ),
-              ),
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (post.featuredImageUrl != null)
+                  Image.network(post.featuredImageUrl!,
+                      width: double.infinity, height: 200, fit: BoxFit.cover),
+                const SizedBox(height: 16),
+                Text(post.title,
+                    style: Theme.of(context).textTheme.headlineMedium),
+                const SizedBox(height: 8),
+                if (post.excerpt != null)
+                  Text(post.excerpt!,
+                      style: Theme.of(context).textTheme.bodyMedium),
+                const SizedBox(height: 16),
+                ...post.contentBlocks
+                    .map((block) => _blockWidget(context, block)),
+              ],
             ),
           );
         },
       ),
     );
   }
-}
 
-/// Renders a post's structured body: section headings, plain
-/// paragraphs, and photo + caption entries (e.g. one per person in a
-/// "meet the team" style post).
-class _BlogBody extends StatelessWidget {
-  final List<BlogContentBlock> blocks;
-  const _BlogBody({required this.blocks});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        for (final block in blocks) _blockWidget(context, block),
-      ],
-    );
-  }
-
-  Widget _blockWidget(BuildContext context, BlogContentBlock block) {
+  Widget _blockWidget(BuildContext context, ContentBlock block) {
     switch (block.type) {
-      case BlogBlockType.heading:
+      case 'heading':
         return Padding(
-          padding: const EdgeInsets.only(top: 24, bottom: 8),
+          padding: const EdgeInsets.symmetric(vertical: 8),
           child: Text(
             block.text ?? '',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+            style: Theme.of(context).textTheme.headlineSmall,
           ),
         );
-      case BlogBlockType.paragraph:
+      case 'paragraph':
         return Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: Text(block.text ?? '', style: const TextStyle(fontSize: 15, height: 1.6, color: AppColors.textPrimary)),
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Text(block.text ?? ''),
         );
-      case BlogBlockType.imageText:
+      case 'imageText':
         return Padding(
-          padding: const EdgeInsets.only(bottom: 16),
-          child: _ImageTextBlock(imageUrl: block.imageUrl, text: block.text ?? ''),
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(
+            children: [
+              if (block.imageUrl != null)
+                Expanded(
+                  flex: 1,
+                  child: Image.network(block.imageUrl!,
+                      height: 120, fit: BoxFit.cover),
+                ),
+              if (block.imageUrl != null) const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: Text(block.text ?? ''),
+              ),
+            ],
+          ),
         );
+      default:
+        return const SizedBox.shrink();
     }
-  }
-}
-
-class _ImageTextBlock extends StatelessWidget {
-  final String? imageUrl;
-  final String text;
-  const _ImageTextBlock({required this.imageUrl, required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    final isMobile = Responsive.isMobile(context);
-    final image = ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: imageUrl != null
-          ? CachedNetworkImage(
-              imageUrl: imageUrl!,
-              width: isMobile ? 64 : 80,
-              height: isMobile ? 64 : 80,
-              fit: BoxFit.cover,
-            )
-          : Container(
-              width: isMobile ? 64 : 80,
-              height: isMobile ? 64 : 80,
-              color: AppColors.background,
-              child: const Icon(Icons.person_outline, color: AppColors.textSecondary),
-            ),
-    );
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        image,
-        const SizedBox(width: 14),
-        Expanded(
-          child: Text(text, style: const TextStyle(fontSize: 15, height: 1.6, color: AppColors.textPrimary)),
-        ),
-      ],
-    );
   }
 }

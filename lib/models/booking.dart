@@ -19,11 +19,11 @@ class Booking {
   final DateTime? createdAt;
   final DateTime? updatedAt;
   final bool reviewSubmitted;
-  // uid of whichever party initiated this booking — an organizer
-  // requesting a musician, or a musician applying to an event. Needed
-  // so the notification Cloud Function knows which party to notify
-  // (always "the other one"), rather than guessing from context.
   final String createdBy;
+
+  // Admin notification fields
+  final bool adminViewed;
+  final bool deleted; // soft-delete for notifications
 
   const Booking({
     required this.id,
@@ -41,6 +41,8 @@ class Booking {
     this.updatedAt,
     this.reviewSubmitted = false,
     required this.createdBy,
+    this.adminViewed = false,
+    this.deleted = false,
   });
 
   factory Booking.fromMap(String id, Map<String, dynamic> map) {
@@ -60,6 +62,8 @@ class Booking {
       updatedAt: (map['updated_at'] as Timestamp?)?.toDate(),
       reviewSubmitted: map['review_submitted'] ?? false,
       createdBy: map['created_by'] ?? map['organizer_id'] ?? '',
+      adminViewed: map['admin_viewed'] ?? false,
+      deleted: map['deleted'] ?? false,
     );
   }
 
@@ -75,10 +79,14 @@ class Booking {
       'message': message,
       'contact_phone': contactPhone,
       'status': status.value,
-      'created_at': createdAt != null ? Timestamp.fromDate(createdAt!) : FieldValue.serverTimestamp(),
+      'created_at': createdAt != null
+          ? Timestamp.fromDate(createdAt!)
+          : FieldValue.serverTimestamp(),
       'updated_at': FieldValue.serverTimestamp(),
       'review_submitted': reviewSubmitted,
       'created_by': createdBy,
+      'admin_viewed': adminViewed,
+      'deleted': deleted,
     };
   }
 }

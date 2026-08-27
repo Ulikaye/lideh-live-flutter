@@ -8,7 +8,8 @@ class StorageService {
   final FirebaseStorage _storage;
   static const _uuid = Uuid();
 
-  StorageService({FirebaseStorage? storage}) : _storage = storage ?? FirebaseStorage.instance;
+  StorageService({FirebaseStorage? storage})
+      : _storage = storage ?? FirebaseStorage.instance;
 
   /// Uploads bytes to `folder/fileName` and returns the download URL.
   /// [onProgress] receives a 0.0–1.0 fraction for progress indicators.
@@ -20,7 +21,10 @@ class StorageService {
   }) async {
     final fileName = '${_uuid.v4()}.$extension';
     final ref = _storage.ref().child('$folder/$fileName');
-    final task = ref.putData(bytes);
+
+    // ✅ Set content type so Storage rules recognize it as an image
+    final metadata = SettableMetadata(contentType: 'image/jpeg');
+    final task = ref.putData(bytes, metadata);
 
     task.snapshotEvents.listen((snapshot) {
       if (onProgress != null && snapshot.totalBytes > 0) {
