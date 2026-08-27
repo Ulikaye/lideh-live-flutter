@@ -1,21 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../../core/constants/strings.dart';
+import '../../../core/constants/strings.dart'; // ✅ THIS is where EcardOccasion lives
 
-/// Shared visual chrome for every occasion's card design — background,
-/// consistent padding/rounding, an optional decorative [background]
-/// layer (florals, cross, geometric accent — see ecard_decorations.dart),
-/// and the QR corner.
 class EcardCardShell extends StatelessWidget {
   final EcardOccasion occasion;
   final Widget child;
   final String? qrData;
   final Color? accentOverride;
-
-  /// Optional decorative layer painted behind [child] and above the
-  /// background gradient, e.g. a [WeddingFloralFrame] or radiant
-  /// cross. Purely visual — has no effect on layout or data.
   final Widget? background;
 
   const EcardCardShell({
@@ -31,11 +24,11 @@ class EcardCardShell extends StatelessWidget {
     if (accentOverride != null) return accentOverride!;
     switch (occasion) {
       case EcardOccasion.wedding:
-        return const Color(0xFFC1694F); // warm terracotta rose
+        return const Color(0xFFC1694F);
       case EcardOccasion.worship:
-        return const Color(0xFF5B4B8A); // rich plum
+        return const Color(0xFF5B4B8A);
       case EcardOccasion.conference:
-        return const Color(0xFF1B2A4A); // deep navy
+        return const Color(0xFF1B2A4A);
       case EcardOccasion.other:
         return AppColors.primaryDark;
     }
@@ -50,19 +43,18 @@ class EcardCardShell extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(28),
           border: Border.all(
-            color: _accent.withValues(alpha: 0.35),
-            width: 1.6,
+            color: const Color(0xFFC9A44C).withValues(alpha: 0.65),
+            width: 2.0,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.12),
-              blurRadius: 32,
-              offset: const Offset(0, 14),
-              spreadRadius: 1,
+              color: Colors.black.withValues(alpha: 0.18),
+              blurRadius: 36,
+              offset: const Offset(0, 16),
             ),
             BoxShadow(
-              color: _accent.withValues(alpha: 0.18),
-              blurRadius: 44,
+              color: _accent.withValues(alpha: 0.22),
+              blurRadius: 48,
               offset: const Offset(0, 0),
             ),
           ],
@@ -70,46 +62,83 @@ class EcardCardShell extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            // Warm, near-cream base so decorative colors stay the
-            // star of the card instead of a tinted wash.
             DecoratedBox(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    const Color(0xFFFFFDF8),
-                    const Color(0xFFFFFDF8),
-                    _accent.withValues(alpha: 0.07),
+                    const Color(0xFFFFFDF9),
+                    const Color(0xFFFAF6EE),
+                    _accent.withValues(alpha: 0.08),
                   ],
                 ),
               ),
             ),
             if (background != null) Positioned.fill(child: background!),
-            // A slim inner hairline keeps the decorative corners from
-            // ever looking like they bleed off the card edge.
             Positioned.fill(
               child: IgnorePointer(
                 child: Container(
-                  margin: const EdgeInsets.all(6),
+                  margin: const EdgeInsets.all(7),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(22),
                     border: Border.all(
-                      color: _accent.withValues(alpha: 0.16),
-                      width: 1,
+                      color: const Color(0xFFC9A44C).withValues(alpha: 0.35),
+                      width: 1.0,
                     ),
                   ),
                 ),
               ),
             ),
             Padding(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.fromLTRB(22, 22, 22, 16),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Expanded(child: child),
-                  const SizedBox(height: 12),
-                  _QrCorner(accent: _accent, qrData: qrData),
+                  const SizedBox(height: 10),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.75),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: _accent.withValues(alpha: 0.15),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'OFFICIAL E-INVITATION',
+                              style: GoogleFonts.inter(
+                                fontSize: 8.5,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 1.5,
+                                color: _accent.withValues(alpha: 0.7),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'www.lideh.co.tz',
+                              style: GoogleFonts.cormorantGaramond(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 1.2,
+                                color: const Color(0xFF2A201C),
+                              ),
+                            ),
+                          ],
+                        ),
+                        _QrCorner(accent: _accent, qrData: qrData),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -129,41 +158,41 @@ class _QrCorner extends StatelessWidget {
   Widget build(BuildContext context) {
     if (qrData == null) {
       return Container(
-        width: 64,
-        height: 64,
+        width: 44,
+        height: 44,
         decoration: BoxDecoration(
           color: accent.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(color: accent.withValues(alpha: 0.22)),
         ),
         child: Icon(
           Icons.qr_code_2_rounded,
-          color: accent.withValues(alpha: 0.5),
-          size: 32,
+          color: accent.withValues(alpha: 0.6),
+          size: 26,
         ),
       );
     }
     return Container(
-      padding: const EdgeInsets.all(7),
+      padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: accent.withValues(alpha: 0.28)),
+        borderRadius: BorderRadius.circular(10),
+        border:
+            Border.all(color: const Color(0xFFC9A44C).withValues(alpha: 0.5)),
         boxShadow: [
           BoxShadow(
-            color: accent.withValues(alpha: 0.18),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: accent.withValues(alpha: 0.15),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
       child:
-          QrImageView(data: qrData!, size: 64, backgroundColor: Colors.white),
+          QrImageView(data: qrData!, size: 42, backgroundColor: Colors.white),
     );
   }
 }
 
-/// Formats a stored field value for display.
 String formatEcardFieldValue(String key, dynamic value) {
   final str = '$value';
   final looksLikeDate =

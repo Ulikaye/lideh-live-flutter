@@ -9,22 +9,26 @@ import '../../core/constants/strings.dart';
 import '../../core/utils/validators.dart';
 import '../../models/event.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/event_provider.dart';
+import '../../shared/widgets/error_widget.dart'; // ✅ AppErrorWidget
 import '../../shared/widgets/loading_indicator.dart';
 
-class CreateEventScreen extends ConsumerStatefulWidget {
-  const CreateEventScreen({super.key});
+class EditEventScreen extends ConsumerStatefulWidget {
+  final String eventId;
+  const EditEventScreen({super.key, required this.eventId});
 
   @override
-  ConsumerState<CreateEventScreen> createState() => _CreateEventScreenState();
+  ConsumerState<EditEventScreen> createState() => _EditEventScreenState();
 }
 
-class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
+class _EditEventScreenState extends ConsumerState<EditEventScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _locationController = TextEditingController();
   final _descriptionController = TextEditingController();
   DateTime? _date;
   TimeOfDay? _time;
+  String? _existingCoverImageUrl;
   bool _saving = false;
 
   // Image upload
@@ -32,10 +36,37 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
   String? _uploadedImageUrl;
   bool _uploadingImage = false;
 
+  bool _initialized = false;
+
+  void _initFromEvent(Event event) {
+    if (_initialized) return;
+    _titleController.text = event.title;
+    _locationController.text = event.location;
+    _descriptionController.text = event.description ?? '';
+    _date = event.date;
+    _time = event.time != null ? _parseTimeOfDay(event.time!) : null;
+    _existingCoverImageUrl = event.coverImageUrl;
+    _uploadedImageUrl = event.coverImageUrl;
+    _initialized = true;
+  }
+
+  TimeOfDay? _parseTimeOfDay(String time) {
+    try {
+      final parts = time.split(':');
+      if (parts.length == 2) {
+        return TimeOfDay(
+            hour: int.parse(parts[0]), minute: int.parse(parts[1]));
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.now().add(const Duration(days: 7)),
+      initialDate: _date ?? DateTime.now().add(const Duration(days: 7)),
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 730)),
     );
@@ -43,8 +74,10 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
   }
 
   Future<void> _pickTime() async {
-    final picked =
-        await showTimePicker(context: context, initialTime: TimeOfDay.now());
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _time ?? TimeOfDay.now(),
+    );
     if (picked != null) setState(() => _time = picked);
   }
 
@@ -98,26 +131,44 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
       return;
     }
     setState(() => _saving = true);
-    final organizerId = ref.read(authServiceProvider).currentUser!.uid;
-    final event = Event(
-      id: '',
-      organizerId: organizerId,
+
+    final firestore = ref.read(firestoreServiceProvider);
+    final currentEvent = ref.read(eventByIdProvider(widget.eventId)).value;
+    if (currentEvent == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Event not found')),
+        );
+      }
+      setState(() => _saving = false);
+      return;
+    }
+
+    final updatedEvent = Event(
+      id: widget.eventId,
+      organizerId: currentEvent.organizerId,
       title: _titleController.text.trim(),
       date: _date!,
       time: _time?.format(context),
       location: _locationController.text.trim(),
       description: _descriptionController.text.trim(),
-      coverImageUrl: _uploadedImageUrl,
-      isPublished: false,
+      coverImageUrl: _uploadedImageUrl ?? _existingCoverImageUrl,
+      isCancelled: currentEvent.isCancelled,
+      isPublished: currentEvent.isPublished,
+      isPinned: currentEvent.isPinned,
+      createdAt: currentEvent.createdAt,
+      updatedAt: DateTime.now(),
     );
+
     try {
-      final id = await ref.read(firestoreServiceProvider).createEvent(event);
-      if (mounted) context.go('/events/$id');
+      // ✅ Use the correct method: updateEvent (NOT setBlogPost)
+      await firestore.updateEvent(widget.eventId, updatedEvent);
+      if (mounted) context.go('/events/${widget.eventId}');
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('Could not create event: $e'),
+              content: Text('Could not update event: $e'),
               backgroundColor: AppColors.danger),
         );
       }
@@ -128,24 +179,32 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final profileAsync = ref.watch(currentUserProfileProvider);
+    final eventAsync = ref.watch(eventByIdProvider(widget.eventId));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Create Event')),
-      body: profileAsync.when(
+      appBar: AppBar(title: const Text('Edit Event')),
+      body: eventAsync.when(
         loading: () => const LoadingIndicator(),
-        error: (e, _) => Center(child: Text('Error: $e')),
-        data: (profile) {
-          if (profile != null && !profile.verified) {
-            return _PendingVerificationNotice();
-          }
-          return _buildForm(context);
+        error: (e, _) => AppErrorWidget(message: 'Could not load event: $e'),
+        data: (event) {
+          if (event == null) return AppErrorWidget(message: 'Event not found');
+          _initFromEvent(event);
+          return _buildForm();
         },
       ),
     );
   }
 
-  Widget _buildForm(BuildContext context) {
+  Widget _buildForm() {
+    final user = FirebaseAuth.instance.currentUser;
+    final event = ref.read(eventByIdProvider(widget.eventId)).value;
+    final isOwner =
+        user != null && event != null && user.uid == event.organizerId;
+    if (!isOwner) {
+      return const Center(
+          child: Text('You do not have permission to edit this event.'));
+    }
+
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
@@ -167,7 +226,8 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
                         color: AppColors.background,
                         child: _uploadingImage
                             ? const Center(child: CircularProgressIndicator())
-                            : _uploadedImageUrl != null
+                            : _uploadedImageUrl != null &&
+                                    _uploadedImageUrl!.isNotEmpty
                                 ? Image.network(_uploadedImageUrl!,
                                     fit: BoxFit.cover)
                                 : const Center(
@@ -245,40 +305,11 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
                           width: 20,
                           child: CircularProgressIndicator(
                               strokeWidth: 2, color: Colors.white))
-                      : const Text('Create Event'),
+                      : const Text('Save Changes'),
                 ),
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PendingVerificationNotice extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.hourglass_top_rounded,
-                size: 56, color: AppColors.textSecondary),
-            const SizedBox(height: 20),
-            Text('Account pending verification',
-                style: Theme.of(context).textTheme.titleLarge,
-                textAlign: TextAlign.center),
-            const SizedBox(height: 12),
-            const Text(
-              'Before you can create and publish events, an admin needs to verify your organizer account. '
-              "This is a one-time check — you'll be able to create events as soon as it's approved.",
-              textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.textSecondary),
-            ),
-          ],
         ),
       ),
     );

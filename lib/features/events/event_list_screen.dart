@@ -10,6 +10,7 @@ import '../../providers/event_provider.dart';
 import '../../shared/widgets/error_widget.dart';
 import '../../shared/widgets/profile_menu_button.dart';
 import '../../shared/widgets/skeleton_loaders.dart';
+import '../../models/event.dart'; // ✅ make sure Event is imported
 
 class EventListScreen extends ConsumerWidget {
   const EventListScreen({super.key});
@@ -35,14 +36,19 @@ class EventListScreen extends ConsumerWidget {
         ],
       ),
       floatingActionButton: canCreate && Responsive.isMobile(context)
-          ? FloatingActionButton(onPressed: () => context.go('/events/create'), child: const Icon(Icons.add))
+          ? FloatingActionButton(
+              onPressed: () => context.go('/events/create'),
+              child: const Icon(Icons.add))
           : null,
       body: eventsAsync.when(
         loading: () => const CenteredContent(child: EventListSkeleton()),
         error: (e, _) => AppErrorWidget(message: 'Could not load events'),
         data: (events) {
           if (events.isEmpty) {
-            return const EmptyStateWidget(title: 'No upcoming events', subtitle: 'Check back soon or create one', icon: Icons.event_busy_outlined);
+            return const EmptyStateWidget(
+                title: 'No upcoming events',
+                subtitle: 'Check back soon or create one',
+                icon: Icons.event_busy_outlined);
           }
           return CenteredContent(
             child: ListView.separated(
@@ -58,38 +64,60 @@ class EventListScreen extends ConsumerWidget {
                       padding: const EdgeInsets.all(16),
                       child: Row(
                         children: [
-                          Container(
-                            width: 60,
-                            height: 60,
-                            decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(DateFormat('MMM').format(event.date).toUpperCase(),
-                                    style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w700, fontSize: 12)),
-                                Text(DateFormat('d').format(event.date),
-                                    style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w800, fontSize: 20)),
-                              ],
-                            ),
+                          // Event thumbnail or placeholder
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: event.coverImageUrl != null &&
+                                    event.coverImageUrl!.isNotEmpty
+                                ? Image.network(
+                                    event.coverImageUrl!,
+                                    width: 60,
+                                    height: 60,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) =>
+                                        _buildDateBox(event),
+                                  )
+                                : _buildDateBox(event),
                           ),
                           const SizedBox(width: 16),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(event.title, style: Theme.of(context).textTheme.titleMedium),
+                                Row(
+                                  children: [
+                                    if (event.isPinned)
+                                      const Icon(Icons.push_pin,
+                                          size: 14, color: AppColors.primary),
+                                    const SizedBox(width: 4),
+                                    Expanded(
+                                      child: Text(event.title,
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .titleMedium),
+                                    ),
+                                  ],
+                                ),
                                 const SizedBox(height: 4),
                                 Row(
                                   children: [
-                                    const Icon(Icons.location_on, size: 13, color: AppColors.textSecondary),
+                                    const Icon(Icons.location_on,
+                                        size: 13,
+                                        color: AppColors.textSecondary),
                                     const SizedBox(width: 4),
-                                    Expanded(child: Text(event.location, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13), overflow: TextOverflow.ellipsis)),
+                                    Expanded(
+                                        child: Text(event.location,
+                                            style: const TextStyle(
+                                                color: AppColors.textSecondary,
+                                                fontSize: 13),
+                                            overflow: TextOverflow.ellipsis)),
                                   ],
                                 ),
                               ],
                             ),
                           ),
-                          const Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary),
+                          const Icon(Icons.chevron_right_rounded,
+                              color: AppColors.textSecondary),
                         ],
                       ),
                     ),
@@ -99,6 +127,31 @@ class EventListScreen extends ConsumerWidget {
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildDateBox(Event event) {
+    return Container(
+      width: 60,
+      height: 60,
+      decoration: BoxDecoration(
+          color: AppColors.primary.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(12)),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(DateFormat('MMM').format(event.date).toUpperCase(),
+              style: const TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12)),
+          Text(DateFormat('d').format(event.date),
+              style: const TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 20)),
+        ],
       ),
     );
   }

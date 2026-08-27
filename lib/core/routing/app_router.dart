@@ -19,6 +19,7 @@ import '../../features/bookings/booking_chat_screen.dart';
 import '../../features/events/event_list_screen.dart';
 import '../../features/events/event_detail_screen.dart';
 import '../../features/events/create_event_screen.dart';
+import '../../features/events/edit_event_screen.dart'; // ✅ ADDED
 import '../../features/blog/content_hub_screen.dart';
 import '../../features/blog/blog_detail_screen.dart';
 import '../../features/admin/admin_blog_list_screen.dart';
@@ -49,7 +50,7 @@ import '../../features/static/static_pages.dart';
 import '../../shared/widgets/error_widget.dart';
 import '../../shared/widgets/loading_indicator.dart';
 import 'page_transitions.dart';
-import '../../features/admin/admin_booking_notifications_screen.dart'; // NEW
+import '../../features/admin/admin_booking_notifications_screen.dart';
 
 final _publicRoutes = <String>{
   '/',
@@ -156,6 +157,12 @@ final routerProvider = Provider<GoRouter>((ref) {
             pageBuilder: (_, s) => slideTransitionPage(
                 state: s,
                 child: EventDetailScreen(eventId: s.pathParameters['id']!)),
+          ),
+          GoRoute(
+            path: '/events/:id/edit',
+            pageBuilder: (_, s) => slideTransitionPage(
+                state: s,
+                child: EditEventScreen(eventId: s.pathParameters['id']!)),
           ),
           GoRoute(path: '/blog', builder: (_, __) => const ContentHubScreen()),
           GoRoute(
@@ -269,14 +276,12 @@ final routerProvider = Provider<GoRouter>((ref) {
                 state: s,
                 child: BookingDetailScreen(bookingId: s.pathParameters['id']!)),
           ),
-          // Chat route for a booking
           GoRoute(
             path: '/bookings/:id/chat',
             pageBuilder: (_, s) => slideTransitionPage(
                 state: s,
                 child: BookingChatScreen(bookingId: s.pathParameters['id']!)),
           ),
-          // 🆕 Admin booking notifications
           GoRoute(
             path: '/admin/booking-notifications',
             pageBuilder: (_, s) => slideTransitionPage(

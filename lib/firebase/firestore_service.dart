@@ -480,6 +480,14 @@ class FirestoreService {
     });
   }
 
+  /// Update an entire event document (used for editing).
+  Future<void> updateEvent(String eventId, Event event) {
+    return _db
+        .collection(AppStrings.eventsCollection)
+        .doc(eventId)
+        .set(event.toMap(), SetOptions(merge: true));
+  }
+
   // ---------------- E-Card Requests ----------------
   CollectionReference<Map<String, dynamic>> get _ecardRequestsRef =>
       _db.collection(AppStrings.ecardRequestsCollection);

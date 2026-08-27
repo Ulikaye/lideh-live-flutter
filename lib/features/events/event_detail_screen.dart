@@ -47,6 +47,19 @@ class EventDetailScreen extends ConsumerWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            // Event poster
+                            if (event.coverImageUrl != null &&
+                                event.coverImageUrl!.isNotEmpty)
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: Image.network(
+                                  event.coverImageUrl!,
+                                  width: double.infinity,
+                                  height: 200,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                            const SizedBox(height: 12),
                             Text(event.title,
                                 style:
                                     Theme.of(context).textTheme.headlineSmall),
@@ -80,7 +93,14 @@ class EventDetailScreen extends ConsumerWidget {
                       ),
                     ),
                     if (ownsThisEvent) ...[
-                      const SizedBox(height: 16),
+                      // ✅ Edit Event button (added)
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        onPressed: () => context.go('/events/${event.id}/edit'),
+                        icon: const Icon(Icons.edit_outlined),
+                        label: const Text('Edit Event'),
+                      ),
+                      const SizedBox(height: 12),
                       Card(
                         child: SwitchListTile(
                           value: event.isPublished,
@@ -164,9 +184,6 @@ class _EcardLinkCard extends ConsumerWidget {
             ),
           );
         }
-        // No E-Card yet for this event — available any time, not just
-        // right after creating the event, and regardless of whether
-        // the event itself is published or still a draft.
         return Card(
           child: ListTile(
             leading: const Icon(Icons.mail_outline_rounded,
