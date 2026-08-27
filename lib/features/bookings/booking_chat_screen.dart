@@ -31,8 +31,7 @@ class _BookingChatScreenState extends ConsumerState<BookingChatScreen> {
     if (currentUser != null && currentProfile != null) {
       myUid = currentUser.uid;
       userDisplayName = currentProfile.displayName ?? currentUser.email;
-      final userTypeName =
-          currentProfile.userType.name; // 'musician', 'organizer', 'admin'
+      final userTypeName = currentProfile.userType.name;
       if (userTypeName == 'musician') {
         myRole = 'musician';
         userType = 'musician';
@@ -62,7 +61,7 @@ class _BookingChatScreenState extends ConsumerState<BookingChatScreen> {
       ),
       body: bookingAsync.when(
         loading: () => const LoadingIndicator(),
-        error: (e, _) => AppErrorWidget(message: 'Could not load booking'),
+        error: (e, _) => AppErrorWidget(message: 'Could not load booking: $e'),
         data: (booking) {
           if (booking == null) {
             return const AppErrorWidget(message: 'Booking not found');
@@ -77,7 +76,23 @@ class _BookingChatScreenState extends ConsumerState<BookingChatScreen> {
 
           return messagesProvider.when(
             loading: () => const LoadingIndicator(),
-            error: (e, _) => AppErrorWidget(message: 'Could not load messages'),
+            error: (e, _) => Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    AppErrorWidget(message: 'Could not load messages: $e'),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () => ref
+                          .refresh(bookingMessagesProvider(widget.bookingId)),
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
             data: (messages) {
               return ChatThreadView(
                 messages: messages,

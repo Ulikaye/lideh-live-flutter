@@ -86,6 +86,26 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('verified', false) == true;
     }
 
+    // ---------------- Booking Messages (musician-organizer chat) ----------------
+    // Moved here after all helper functions are defined.
+    match /bookings/{bookingId}/messages/{messageId} {
+      allow read: if isSignedIn() && (
+        resource.data.senderId == request.auth.uid ||
+        get(/databases/$(database)/documents/bookings/$(bookingId)).data.musician_id == request.auth.uid ||
+        get(/databases/$(database)/documents/bookings/$(bookingId)).data.organizer_id == request.auth.uid ||
+        isAdmin()
+      );
+      allow create: if isSignedIn() && (
+        (request.resource.data.senderId == request.auth.uid &&
+         (request.resource.data.senderRole == 'musician' || request.resource.data.senderRole == 'organizer' || request.resource.data.senderRole == 'admin') &&
+         (get(/databases/$(database)/documents/bookings/$(bookingId)).data.musician_id == request.auth.uid ||
+          get(/databases/$(database)/documents/bookings/$(bookingId)).data.organizer_id == request.auth.uid)) ||
+        isAdmin()
+      );
+      allow update: if isAdmin(); // only admin can soft-delete or like
+      allow delete: if false;
+    }
+
     // ---------------- Users ----------------
     match /users/{uid} {
       allow read: if isSignedIn();
