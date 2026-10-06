@@ -12,9 +12,9 @@ const FIREBASE_CONFIG={
 };
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
+const app = initializeApp(FIREBASE_CONFIG);
 const analytics = getAnalytics(app);
 
-FIREBASE_CONFIG.enabled=!/^YOUR/.test(FIREBASE_CONFIG.apiKey);
+FIREBASE_CONFIG.enabled = true;
 /* Map: free key from cloud.maptiler.com (restrict it to your domain there). Leave empty to use OpenStreetMap tiles. */
-const MAPTILER_KEY="https://api.maptiler.com/maps/base-v4/?key=vixedC7CNd4zl39g0nxj#2.4/1.37845/13.32978";
+const MAPTILER_KEY="vixedC7CNd4zl39g0nxj";
