@@ -1,12 +1,8 @@
 /* ===== LideH Live configuration. Fill these in, then commit. =====
    Firebase: Console > Project settings > Your apps > Web app > "firebaseConfig".
    These web keys are meant to be public. Your data is protected by firestore.rules, not by hiding the key. */
-// https://firebase.google.com/docs/web/setup#available-libraries
-
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
-  apiKey: "AIzaSyC1bFhsiCSvuUwGJ2Y5gAlezOMk-j8b6qM",
+const FIREBASE_CONFIG={
+   apiKey: "AIzaSyC1bFhsiCSvuUwGJ2Y5gAlezOMk-j8b6qM",
   authDomain: "lideh-live.firebaseapp.com",
   projectId: "lideh-live",
   storageBucket: "lideh-live.firebasestorage.app",
@@ -19,6 +15,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const analytics = getAnalytics(app);
 
-
+FIREBASE_CONFIG.enabled=!/^YOUR/.test(FIREBASE_CONFIG.apiKey);
 /* Map: free key from cloud.maptiler.com (restrict it to your domain there). Leave empty to use OpenStreetMap tiles. */
 const MAPTILER_KEY="https://api.maptiler.com/maps/base-v4/?key=vixedC7CNd4zl39g0nxj#2.4/1.37845/13.32978";
