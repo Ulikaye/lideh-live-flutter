@@ -1,7 +1,1 @@
-{
-  "projects": {
-    "default": "lideh-live"
-  },
-  "targets": {},
-  "etags": {}
-}
+{ "projects": { "default": "lideh-live" } }

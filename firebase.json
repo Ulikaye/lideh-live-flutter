@@ -1,24 +1,13 @@
 {
-  "firestore": {
-    "rules": "firebase/firestore.rules",
-    "indexes": "firebase/firestore.indexes.json"
-  },
-  "storage": {
-    "rules": "firebase/storage.rules"
-  },
-  "functions": {
-    "source": "functions"
-  },
   "hosting": {
-    "public": "build/web",
+    "public": "public",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
-    "rewrites": [
-      { "source": "/", "function": "ssrRouter" },
-      { "source": "/musicians/**", "function": "ssrRouter" },
-      { "source": "/blog/**", "function": "ssrRouter" },
-      { "source": "/events/**", "function": "ssrRouter" },
-      { "source": "/sitemap.xml", "function": "sitemap" },
-      { "source": "**", "destination": "/index.html" }
+    "cleanUrls": true,
+    "headers": [
+      { "source": "/flutter_service_worker.js", "headers": [{ "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }] },
+      { "source": "/index.html", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] },
+      { "source": "**/*.@(js|css)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=300" }] }
     ]
-  }
+  },
+  "firestore": { "rules": "firestore.rules" }
 }

@@ -1,0 +1,31 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
+<title>LideH Live Admin</title><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;800&family=Figtree:wght@400;500;700&display=swap"><link rel="stylesheet" href="css/style.css">
+<style>body{padding:20px 16px 60px}.w{max-width:760px;margin:auto}label{display:block;font-weight:700;font-size:13px;margin:12px 0 4px}.row{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}.row button{color:var(--red);font-weight:700}#msg{margin:12px 0;font-weight:700}</style></head><body><div class="w">
+<h2 style="margin-top:0">lideh live admin</h2><p class="sub">Enter prices, regions, places, pests and news. Changes appear on the site immediately.</p><div id="msg"></div>
+<div class="card" id="login"><label>Email</label><input id="em" type="email" autocomplete="username"><label>Password</label><input id="pw" type="password" autocomplete="current-password"><p style="margin-top:14px"><button class="btn" id="go">Sign in</button></p></div>
+<div id="app" hidden><div class="chips" id="tabs"></div><div class="card"><div id="form"></div><p style="margin-top:14px"><button class="btn" id="save">Save</button><button class="btn g" id="seed" style="color:var(--ink)">Load sample data</button><button class="btn g" id="out" style="color:var(--ink)">Sign out</button></p></div><h2>saved items</h2><div class="card" id="list"></div></div></div>
+<script src="js/config.js"></script><script src="js/seed.js"></script><script>
+const $=s=>document.querySelector(s),say=(t,bad)=>{$('#msg').textContent=t;$('#msg').style.color=bad?'var(--red)':'var(--ok)'};
+const T={type:['pest','disease'],ptype:['market','shop','office']};
+const SCH={
+ prices:{n:'Prices',f:[['crop','text'],['region','text'],['month','month'],['price','number','TZS per kg']],id:f=>f.crop+'__'+f.region,doc:f=>({crop:f.crop,region:f.region,history:{[f.month]:+f.price}}),merge:1,show:d=>d.crop+' / '+d.region+' ('+Object.keys(d.history||{}).length+' months)'},
+ regions:{n:'Regions',f:[['name','text'],['lon','number'],['lat','number'],['farms','number'],['ha','number','hectares'],['crops','text','comma separated']],id:f=>f.name,doc:f=>({name:f.name,lon:+f.lon,lat:+f.lat,farms:+f.farms,ha:+f.ha,crops:f.crops.split(',').map(s=>s.trim()).filter(Boolean)}),show:d=>d.name},
+ places:{n:'Places',f:[['name','text'],['type','select',T.ptype],['region','text'],['lon','number'],['lat','number'],['size','text','Large, Medium, Small, Government'],['desc','text']],id:f=>'p'+Date.now(),doc:f=>({...f,lon:+f.lon,lat:+f.lat}),show:d=>d.name+' ('+d.type+', '+d.region+')'},
+ pests:{n:'Pests and diseases',f:[['name','text'],['type','select',T.type],['affects','text'],['symptoms','text'],['treatment','text'],['prevention','text']],id:f=>f.name.toLowerCase().replace(/\W+/g,'-'),doc:f=>f,show:d=>d.name+' ('+d.type+')'},
+ news:{n:'News',f:[['title','text'],['cat','text','Market, Alert, Tip'],['date','date'],['body','text']],id:f=>'n'+Date.now(),doc:f=>f,show:d=>d.title}};
+let db,au,cur='prices';
+(async()=>{if(!FIREBASE_CONFIG.enabled){say('Add your Firebase config in js/config.js first.',1);return}
+ const b='https://www.gstatic.com/firebasejs/10.12.2/',ld=u=>new Promise((o,n)=>{const s=document.createElement('script');s.src=u;s.onload=o;s.onerror=n;document.head.appendChild(s)});
+ for(const f of['app','auth','firestore'])await ld(b+'firebase-'+f+'-compat.js');const{enabled,...c}=FIREBASE_CONFIG;firebase.initializeApp(c);db=firebase.firestore();au=firebase.auth();
+ au.onAuthStateChanged(u=>{$('#login').hidden=!!u;$('#app').hidden=!u;if(u){say('Signed in. Your UID: '+u.uid+' (it must exist in the admins collection).');tab(cur)}})})();
+$('#go').onclick=()=>au.signInWithEmailAndPassword($('#em').value,$('#pw').value).catch(e=>say(e.message,1));$('#out').onclick=()=>au.signOut();
+function tab(k){cur=k;$('#tabs').innerHTML=Object.keys(SCH).map(x=>`<button class="chip ${x===k?'on':''}" data-k="${x}">${SCH[x].n}</button>`).join('');
+ $('#form').innerHTML=SCH[k].f.map(([n,t,x])=>t==='select'?`<label>${n}</label><select id="f_${n}">${x.map(o=>`<option>${o}</option>`).join('')}</select>`:`<label>${n}${t==='number'&&x?' ('+x+')':t==='text'&&x?' ('+x+')':''}</label><input id="f_${n}" type="${t}" step="any">`).join('');list()}
+$('#tabs').onclick=e=>{if(e.target.dataset.k)tab(e.target.dataset.k)};
+async function list(){try{const s=await db.collection(cur).get();$('#list').innerHTML=s.docs.map(d=>`<div class="row"><span>${SCH[cur].show(d.data())}</span><button data-id="${d.id}">Delete</button></div>`).join('')||'<span class="mut">Nothing saved yet.</span>'}catch(e){say(e.code==='permission-denied'?'Not allowed. Add your UID to the admins collection.':e.message,1)}}
+$('#list').onclick=async e=>{if(e.target.dataset.id&&confirm('Delete this item?')){await db.collection(cur).doc(e.target.dataset.id).delete();list()}};
+$('#save').onclick=async()=>{const S=SCH[cur],f={};S.f.forEach(([n])=>f[n]=$('#f_'+n).value.trim());if(S.f.some(([n])=>!f[n]))return say('Fill in every field.',1);
+ try{await db.collection(cur).doc(S.id(f)).set(S.doc(f),S.merge?{merge:true}:undefined);say('Saved.');list()}catch(e){say(e.code==='permission-denied'?'Not allowed. Add your UID to the admins collection.':e.message,1)}};
+$('#seed').onclick=async()=>{if(!confirm('Write sample data to the database? Existing items with the same ids are replaced.'))return;
+ try{const rows=SEED();for(let i=0;i<rows.length;i+=400){const b=db.batch();rows.slice(i,i+400).forEach(([c,id,d])=>b.set(db.collection(c).doc(id),d));await b.commit()}say('Sample data loaded: '+rows.length+' items.');list()}catch(e){say(e.message,1)}};
+</script></body></html>

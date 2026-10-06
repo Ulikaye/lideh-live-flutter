@@ -1,0 +1,20 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAdmin() { return request.auth != null && exists(/databases/$(database)/documents/admins/$(request.auth.uid)); }
+
+    // Site content: everyone reads, only admins write.
+    match /{col}/{id} {
+      allow read: if col in ['prices','regions','places','pests','news'];
+      allow write: if col in ['prices','regions','places','pests','news'] && isAdmin();
+    }
+    // Public visitor counter: a write may only add exactly 1.
+    match /stats/{day} {
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasOnly(['visitors']) && request.resource.data.visitors == 1;
+      allow update: if request.resource.data.keys().hasOnly(['visitors']) && request.resource.data.visitors == resource.data.visitors + 1;
+    }
+    // Admin list: created by hand in the console only.
+    match /admins/{uid} { allow read: if request.auth != null && request.auth.uid == uid; }
+  }
+}
